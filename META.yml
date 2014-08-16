@@ -1,0 +1,506 @@
+---
+abstract: "It's a core module of bounceHammer version 4"
+author:
+  - azumakuniyuki
+build_requires:
+  Test::More: 0.98
+configure_requires:
+  CPAN::Meta: 0
+  CPAN::Meta::Prereqs: 0
+  Module::Build: 0.38
+dynamic_config: 0
+generated_by: 'Minilla/v0.5.3, CPAN::Meta::Converter version 2.131560'
+license: bsd
+meta-spec:
+  url: http://module-build.sourceforge.net/META-spec-v1.4.html
+  version: 1.4
+name: Sisimai
+no_index:
+  directory:
+    - t
+    - xt
+    - inc
+    - share
+    - eg
+    - examples
+    - author
+provides:
+  Sisimai:
+    file: lib/Sisimai.pm
+    version: v4.0.0
+  Sisimai::ARF:
+    file: lib/Sisimai/ARF.pm
+  Sisimai::Address:
+    file: lib/Sisimai/Address.pm
+  Sisimai::Data:
+    file: lib/Sisimai/Data.pm
+  Sisimai::Data::JSON:
+    file: lib/Sisimai/Data/JSON.pm
+  Sisimai::Group:
+    file: lib/Sisimai/Group.pm
+  Sisimai::Group::AE::Phone:
+    file: lib/Sisimai/Group/AE/Phone.pm
+  Sisimai::Group::AE::Web:
+    file: lib/Sisimai/Group/AE/Web.pm
+  Sisimai::Group::AL::Phone:
+    file: lib/Sisimai/Group/AL/Phone.pm
+  Sisimai::Group::AL::Web:
+    file: lib/Sisimai/Group/AL/Web.pm
+  Sisimai::Group::AR::Phone:
+    file: lib/Sisimai/Group/AR/Phone.pm
+  Sisimai::Group::AR::Web:
+    file: lib/Sisimai/Group/AR/Web.pm
+  Sisimai::Group::AT::Phone:
+    file: lib/Sisimai/Group/AT/Phone.pm
+  Sisimai::Group::AT::Web:
+    file: lib/Sisimai/Group/AT/Web.pm
+  Sisimai::Group::AU::Phone:
+    file: lib/Sisimai/Group/AU/Phone.pm
+  Sisimai::Group::AU::Web:
+    file: lib/Sisimai/Group/AU/Web.pm
+  Sisimai::Group::AW::Phone:
+    file: lib/Sisimai/Group/AW/Phone.pm
+  Sisimai::Group::AW::Web:
+    file: lib/Sisimai/Group/AW/Web.pm
+  Sisimai::Group::BE::Phone:
+    file: lib/Sisimai/Group/BE/Phone.pm
+  Sisimai::Group::BE::Web:
+    file: lib/Sisimai/Group/BE/Web.pm
+  Sisimai::Group::BG::Phone:
+    file: lib/Sisimai/Group/BG/Phone.pm
+  Sisimai::Group::BG::Web:
+    file: lib/Sisimai/Group/BG/Web.pm
+  Sisimai::Group::BM::Phone:
+    file: lib/Sisimai/Group/BM/Phone.pm
+  Sisimai::Group::BM::Web:
+    file: lib/Sisimai/Group/BM/Web.pm
+  Sisimai::Group::BR::Phone:
+    file: lib/Sisimai/Group/BR/Phone.pm
+  Sisimai::Group::BR::Web:
+    file: lib/Sisimai/Group/BR/Web.pm
+  Sisimai::Group::BS::Phone:
+    file: lib/Sisimai/Group/BS/Phone.pm
+  Sisimai::Group::BS::Web:
+    file: lib/Sisimai/Group/BS/Web.pm
+  Sisimai::Group::CA::Phone:
+    file: lib/Sisimai/Group/CA/Phone.pm
+  Sisimai::Group::CA::Web:
+    file: lib/Sisimai/Group/CA/Web.pm
+  Sisimai::Group::CH::Phone:
+    file: lib/Sisimai/Group/CH/Phone.pm
+  Sisimai::Group::CH::Web:
+    file: lib/Sisimai/Group/CH/Web.pm
+  Sisimai::Group::CL::Phone:
+    file: lib/Sisimai/Group/CL/Phone.pm
+  Sisimai::Group::CL::Web:
+    file: lib/Sisimai/Group/CL/Web.pm
+  Sisimai::Group::CN::Phone:
+    file: lib/Sisimai/Group/CN/Phone.pm
+  Sisimai::Group::CN::Web:
+    file: lib/Sisimai/Group/CN/Web.pm
+  Sisimai::Group::CO::Phone:
+    file: lib/Sisimai/Group/CO/Phone.pm
+  Sisimai::Group::CO::Web:
+    file: lib/Sisimai/Group/CO/Web.pm
+  Sisimai::Group::CR::Phone:
+    file: lib/Sisimai/Group/CR/Phone.pm
+  Sisimai::Group::CR::Web:
+    file: lib/Sisimai/Group/CR/Web.pm
+  Sisimai::Group::CZ::Phone:
+    file: lib/Sisimai/Group/CZ/Phone.pm
+  Sisimai::Group::CZ::Web:
+    file: lib/Sisimai/Group/CZ/Web.pm
+  Sisimai::Group::DE::Phone:
+    file: lib/Sisimai/Group/DE/Phone.pm
+  Sisimai::Group::DE::Web:
+    file: lib/Sisimai/Group/DE/Web.pm
+  Sisimai::Group::DK::Phone:
+    file: lib/Sisimai/Group/DK/Phone.pm
+  Sisimai::Group::DK::Web:
+    file: lib/Sisimai/Group/DK/Web.pm
+  Sisimai::Group::DO::Phone:
+    file: lib/Sisimai/Group/DO/Phone.pm
+  Sisimai::Group::DO::Web:
+    file: lib/Sisimai/Group/DO/Web.pm
+  Sisimai::Group::EC::Phone:
+    file: lib/Sisimai/Group/EC/Phone.pm
+  Sisimai::Group::EC::Web:
+    file: lib/Sisimai/Group/EC/Web.pm
+  Sisimai::Group::EG::Phone:
+    file: lib/Sisimai/Group/EG/Phone.pm
+  Sisimai::Group::EG::Web:
+    file: lib/Sisimai/Group/EG/Web.pm
+  Sisimai::Group::ES::Phone:
+    file: lib/Sisimai/Group/ES/Phone.pm
+  Sisimai::Group::ES::Web:
+    file: lib/Sisimai/Group/ES/Web.pm
+  Sisimai::Group::FR::Phone:
+    file: lib/Sisimai/Group/FR/Phone.pm
+  Sisimai::Group::FR::Web:
+    file: lib/Sisimai/Group/FR/Web.pm
+  Sisimai::Group::GR::Phone:
+    file: lib/Sisimai/Group/GR/Phone.pm
+  Sisimai::Group::GR::Web:
+    file: lib/Sisimai/Group/GR/Web.pm
+  Sisimai::Group::GT::Phone:
+    file: lib/Sisimai/Group/GT/Phone.pm
+  Sisimai::Group::GT::Web:
+    file: lib/Sisimai/Group/GT/Web.pm
+  Sisimai::Group::HK::Phone:
+    file: lib/Sisimai/Group/HK/Phone.pm
+  Sisimai::Group::HK::Web:
+    file: lib/Sisimai/Group/HK/Web.pm
+  Sisimai::Group::HN::Phone:
+    file: lib/Sisimai/Group/HN/Phone.pm
+  Sisimai::Group::HN::Web:
+    file: lib/Sisimai/Group/HN/Web.pm
+  Sisimai::Group::HR::Phone:
+    file: lib/Sisimai/Group/HR/Phone.pm
+  Sisimai::Group::HR::Web:
+    file: lib/Sisimai/Group/HR/Web.pm
+  Sisimai::Group::HU::Phone:
+    file: lib/Sisimai/Group/HU/Phone.pm
+  Sisimai::Group::HU::Web:
+    file: lib/Sisimai/Group/HU/Web.pm
+  Sisimai::Group::ID::Phone:
+    file: lib/Sisimai/Group/ID/Phone.pm
+  Sisimai::Group::ID::Web:
+    file: lib/Sisimai/Group/ID/Web.pm
+  Sisimai::Group::IE::Phone:
+    file: lib/Sisimai/Group/IE/Phone.pm
+  Sisimai::Group::IE::Web:
+    file: lib/Sisimai/Group/IE/Web.pm
+  Sisimai::Group::IL::Phone:
+    file: lib/Sisimai/Group/IL/Phone.pm
+  Sisimai::Group::IL::Web:
+    file: lib/Sisimai/Group/IL/Web.pm
+  Sisimai::Group::IN::Phone:
+    file: lib/Sisimai/Group/IN/Phone.pm
+  Sisimai::Group::IN::Web:
+    file: lib/Sisimai/Group/IN/Web.pm
+  Sisimai::Group::IR::Phone:
+    file: lib/Sisimai/Group/IR/Phone.pm
+  Sisimai::Group::IR::Web:
+    file: lib/Sisimai/Group/IR/Web.pm
+  Sisimai::Group::IS::Phone:
+    file: lib/Sisimai/Group/IS/Phone.pm
+  Sisimai::Group::IS::Web:
+    file: lib/Sisimai/Group/IS/Web.pm
+  Sisimai::Group::IT::Phone:
+    file: lib/Sisimai/Group/IT/Phone.pm
+  Sisimai::Group::IT::Web:
+    file: lib/Sisimai/Group/IT/Web.pm
+  Sisimai::Group::JM::Phone:
+    file: lib/Sisimai/Group/JM/Phone.pm
+  Sisimai::Group::JM::Web:
+    file: lib/Sisimai/Group/JM/Web.pm
+  Sisimai::Group::JP::Phone:
+    file: lib/Sisimai/Group/JP/Phone.pm
+  Sisimai::Group::JP::Web:
+    file: lib/Sisimai/Group/JP/Web.pm
+  Sisimai::Group::KE::Phone:
+    file: lib/Sisimai/Group/KE/Phone.pm
+  Sisimai::Group::KE::Web:
+    file: lib/Sisimai/Group/KE/Web.pm
+  Sisimai::Group::KR::Phone:
+    file: lib/Sisimai/Group/KR/Phone.pm
+  Sisimai::Group::KR::Web:
+    file: lib/Sisimai/Group/KR/Web.pm
+  Sisimai::Group::LB::Phone:
+    file: lib/Sisimai/Group/LB/Phone.pm
+  Sisimai::Group::LB::Web:
+    file: lib/Sisimai/Group/LB/Web.pm
+  Sisimai::Group::LK::Phone:
+    file: lib/Sisimai/Group/LK/Phone.pm
+  Sisimai::Group::LK::Web:
+    file: lib/Sisimai/Group/LK/Web.pm
+  Sisimai::Group::LU::Phone:
+    file: lib/Sisimai/Group/LU/Phone.pm
+  Sisimai::Group::LU::Web:
+    file: lib/Sisimai/Group/LU/Web.pm
+  Sisimai::Group::LV::Phone:
+    file: lib/Sisimai/Group/LV/Phone.pm
+  Sisimai::Group::LV::Web:
+    file: lib/Sisimai/Group/LV/Web.pm
+  Sisimai::Group::MA::Phone:
+    file: lib/Sisimai/Group/MA/Phone.pm
+  Sisimai::Group::MA::Web:
+    file: lib/Sisimai/Group/MA/Web.pm
+  Sisimai::Group::MD::Phone:
+    file: lib/Sisimai/Group/MD/Phone.pm
+  Sisimai::Group::MD::Web:
+    file: lib/Sisimai/Group/MD/Web.pm
+  Sisimai::Group::ME::Phone:
+    file: lib/Sisimai/Group/ME/Phone.pm
+  Sisimai::Group::ME::Web:
+    file: lib/Sisimai/Group/ME/Web.pm
+  Sisimai::Group::MK::Phone:
+    file: lib/Sisimai/Group/MK/Phone.pm
+  Sisimai::Group::MK::Web:
+    file: lib/Sisimai/Group/MK/Web.pm
+  Sisimai::Group::MO::Phone:
+    file: lib/Sisimai/Group/MO/Phone.pm
+  Sisimai::Group::MO::Web:
+    file: lib/Sisimai/Group/MO/Web.pm
+  Sisimai::Group::MU::Phone:
+    file: lib/Sisimai/Group/MU/Phone.pm
+  Sisimai::Group::MU::Web:
+    file: lib/Sisimai/Group/MU/Web.pm
+  Sisimai::Group::MX::Phone:
+    file: lib/Sisimai/Group/MX/Phone.pm
+  Sisimai::Group::MX::Web:
+    file: lib/Sisimai/Group/MX/Web.pm
+  Sisimai::Group::MY::Phone:
+    file: lib/Sisimai/Group/MY/Phone.pm
+  Sisimai::Group::MY::Web:
+    file: lib/Sisimai/Group/MY/Web.pm
+  Sisimai::Group::NG::Phone:
+    file: lib/Sisimai/Group/NG/Phone.pm
+  Sisimai::Group::NG::Web:
+    file: lib/Sisimai/Group/NG/Web.pm
+  Sisimai::Group::NI::Phone:
+    file: lib/Sisimai/Group/NI/Phone.pm
+  Sisimai::Group::NI::Web:
+    file: lib/Sisimai/Group/NI/Web.pm
+  Sisimai::Group::NL::Phone:
+    file: lib/Sisimai/Group/NL/Phone.pm
+  Sisimai::Group::NL::Web:
+    file: lib/Sisimai/Group/NL/Web.pm
+  Sisimai::Group::NO::Phone:
+    file: lib/Sisimai/Group/NO/Phone.pm
+  Sisimai::Group::NO::Web:
+    file: lib/Sisimai/Group/NO/Web.pm
+  Sisimai::Group::NP::Phone:
+    file: lib/Sisimai/Group/NP/Phone.pm
+  Sisimai::Group::NP::Web:
+    file: lib/Sisimai/Group/NP/Web.pm
+  Sisimai::Group::NZ::Phone:
+    file: lib/Sisimai/Group/NZ/Phone.pm
+  Sisimai::Group::NZ::Web:
+    file: lib/Sisimai/Group/NZ/Web.pm
+  Sisimai::Group::OM::Phone:
+    file: lib/Sisimai/Group/OM/Phone.pm
+  Sisimai::Group::OM::Web:
+    file: lib/Sisimai/Group/OM/Web.pm
+  Sisimai::Group::PA::Phone:
+    file: lib/Sisimai/Group/PA/Phone.pm
+  Sisimai::Group::PA::Web:
+    file: lib/Sisimai/Group/PA/Web.pm
+  Sisimai::Group::PE::Phone:
+    file: lib/Sisimai/Group/PE/Phone.pm
+  Sisimai::Group::PE::Web:
+    file: lib/Sisimai/Group/PE/Web.pm
+  Sisimai::Group::PH::Phone:
+    file: lib/Sisimai/Group/PH/Phone.pm
+  Sisimai::Group::PH::Web:
+    file: lib/Sisimai/Group/PH/Web.pm
+  Sisimai::Group::PK::Phone:
+    file: lib/Sisimai/Group/PK/Phone.pm
+  Sisimai::Group::PK::Web:
+    file: lib/Sisimai/Group/PK/Web.pm
+  Sisimai::Group::PL::Phone:
+    file: lib/Sisimai/Group/PL/Phone.pm
+  Sisimai::Group::PL::Web:
+    file: lib/Sisimai/Group/PL/Web.pm
+  Sisimai::Group::PR::Phone:
+    file: lib/Sisimai/Group/PR/Phone.pm
+  Sisimai::Group::PR::Web:
+    file: lib/Sisimai/Group/PR/Web.pm
+  Sisimai::Group::PT::Phone:
+    file: lib/Sisimai/Group/PT/Phone.pm
+  Sisimai::Group::PT::Web:
+    file: lib/Sisimai/Group/PT/Web.pm
+  Sisimai::Group::PY::Phone:
+    file: lib/Sisimai/Group/PY/Phone.pm
+  Sisimai::Group::PY::Web:
+    file: lib/Sisimai/Group/PY/Web.pm
+  Sisimai::Group::Phone:
+    file: lib/Sisimai/Group/Phone.pm
+  Sisimai::Group::RO::Phone:
+    file: lib/Sisimai/Group/RO/Phone.pm
+  Sisimai::Group::RO::Web:
+    file: lib/Sisimai/Group/RO/Web.pm
+  Sisimai::Group::RS::Phone:
+    file: lib/Sisimai/Group/RS/Phone.pm
+  Sisimai::Group::RS::Web:
+    file: lib/Sisimai/Group/RS/Web.pm
+  Sisimai::Group::RU::Phone:
+    file: lib/Sisimai/Group/RU/Phone.pm
+  Sisimai::Group::RU::Web:
+    file: lib/Sisimai/Group/RU/Web.pm
+  Sisimai::Group::SA::Phone:
+    file: lib/Sisimai/Group/SA/Phone.pm
+  Sisimai::Group::SA::Web:
+    file: lib/Sisimai/Group/SA/Web.pm
+  Sisimai::Group::SE::Phone:
+    file: lib/Sisimai/Group/SE/Phone.pm
+  Sisimai::Group::SE::Web:
+    file: lib/Sisimai/Group/SE/Web.pm
+  Sisimai::Group::SG::Phone:
+    file: lib/Sisimai/Group/SG/Phone.pm
+  Sisimai::Group::SG::Web:
+    file: lib/Sisimai/Group/SG/Web.pm
+  Sisimai::Group::SK::Phone:
+    file: lib/Sisimai/Group/SK/Phone.pm
+  Sisimai::Group::SK::Web:
+    file: lib/Sisimai/Group/SK/Web.pm
+  Sisimai::Group::SR::Phone:
+    file: lib/Sisimai/Group/SR/Phone.pm
+  Sisimai::Group::SR::Web:
+    file: lib/Sisimai/Group/SR/Web.pm
+  Sisimai::Group::SV::Phone:
+    file: lib/Sisimai/Group/SV/Phone.pm
+  Sisimai::Group::SV::Web:
+    file: lib/Sisimai/Group/SV/Web.pm
+  Sisimai::Group::TH::Phone:
+    file: lib/Sisimai/Group/TH/Phone.pm
+  Sisimai::Group::TH::Web:
+    file: lib/Sisimai/Group/TH/Web.pm
+  Sisimai::Group::TR::Phone:
+    file: lib/Sisimai/Group/TR/Phone.pm
+  Sisimai::Group::TR::Web:
+    file: lib/Sisimai/Group/TR/Web.pm
+  Sisimai::Group::TW::Phone:
+    file: lib/Sisimai/Group/TW/Phone.pm
+  Sisimai::Group::TW::Web:
+    file: lib/Sisimai/Group/TW/Web.pm
+  Sisimai::Group::UA::Phone:
+    file: lib/Sisimai/Group/UA/Phone.pm
+  Sisimai::Group::UA::Web:
+    file: lib/Sisimai/Group/UA/Web.pm
+  Sisimai::Group::UG::Phone:
+    file: lib/Sisimai/Group/UG/Phone.pm
+  Sisimai::Group::UG::Web:
+    file: lib/Sisimai/Group/UG/Web.pm
+  Sisimai::Group::UK::Phone:
+    file: lib/Sisimai/Group/UK/Phone.pm
+  Sisimai::Group::UK::Web:
+    file: lib/Sisimai/Group/UK/Web.pm
+  Sisimai::Group::US::Phone:
+    file: lib/Sisimai/Group/US/Phone.pm
+  Sisimai::Group::US::Web:
+    file: lib/Sisimai/Group/US/Web.pm
+  Sisimai::Group::UY::Phone:
+    file: lib/Sisimai/Group/UY/Phone.pm
+  Sisimai::Group::UY::Web:
+    file: lib/Sisimai/Group/UY/Web.pm
+  Sisimai::Group::VE::Phone:
+    file: lib/Sisimai/Group/VE/Phone.pm
+  Sisimai::Group::VE::Web:
+    file: lib/Sisimai/Group/VE/Web.pm
+  Sisimai::Group::VN::Phone:
+    file: lib/Sisimai/Group/VN/Phone.pm
+  Sisimai::Group::VN::Web:
+    file: lib/Sisimai/Group/VN/Web.pm
+  Sisimai::Group::Web:
+    file: lib/Sisimai/Group/Web.pm
+  Sisimai::Group::ZA::Phone:
+    file: lib/Sisimai/Group/ZA/Phone.pm
+  Sisimai::Group::ZA::Web:
+    file: lib/Sisimai/Group/ZA/Web.pm
+  Sisimai::ISO3166:
+    file: lib/Sisimai/ISO3166.pm
+  Sisimai::MDA:
+    file: lib/Sisimai/MDA.pm
+  Sisimai::MIME:
+    file: lib/Sisimai/MIME.pm
+  Sisimai::MSP:
+    file: lib/Sisimai/MSP.pm
+  Sisimai::MSP::JP::Biglobe:
+    file: lib/Sisimai/MSP/JP/Biglobe.pm
+  Sisimai::MSP::JP::KDDI:
+    file: lib/Sisimai/MSP/JP/KDDI.pm
+  Sisimai::MSP::US::AmazonSES:
+    file: lib/Sisimai/MSP/US/AmazonSES.pm
+  Sisimai::MSP::US::Facebook:
+    file: lib/Sisimai/MSP/US/Facebook.pm
+  Sisimai::MSP::US::Google:
+    file: lib/Sisimai/MSP/US/Google.pm
+  Sisimai::MSP::US::Verizon:
+    file: lib/Sisimai/MSP/US/Verizon.pm
+  Sisimai::MTA:
+    file: lib/Sisimai/MTA.pm
+  Sisimai::MTA::Courier:
+    file: lib/Sisimai/MTA/Courier.pm
+  Sisimai::MTA::Exchange:
+    file: lib/Sisimai/MTA/Exchange.pm
+  Sisimai::MTA::Exim:
+    file: lib/Sisimai/MTA/Exim.pm
+  Sisimai::MTA::Fallback:
+    file: lib/Sisimai/MTA/Fallback.pm
+  Sisimai::MTA::OpenSMTPD:
+    file: lib/Sisimai/MTA/OpenSMTPD.pm
+  Sisimai::MTA::Postfix:
+    file: lib/Sisimai/MTA/Postfix.pm
+  Sisimai::MTA::Sendmail:
+    file: lib/Sisimai/MTA/Sendmail.pm
+  Sisimai::MTA::qmail:
+    file: lib/Sisimai/MTA/qmail.pm
+  Sisimai::Mail:
+    file: lib/Sisimai/Mail.pm
+  Sisimai::Mail::Maildir:
+    file: lib/Sisimai/Mail/Maildir.pm
+  Sisimai::Mail::Mbox:
+    file: lib/Sisimai/Mail/Mbox.pm
+  Sisimai::Message:
+    file: lib/Sisimai/Message.pm
+  Sisimai::RFC2606:
+    file: lib/Sisimai/RFC2606.pm
+  Sisimai::RFC3463:
+    file: lib/Sisimai/RFC3463.pm
+  Sisimai::RFC5322:
+    file: lib/Sisimai/RFC5322.pm
+  Sisimai::Reason:
+    file: lib/Sisimai/Reason.pm
+  Sisimai::Reason::Blocked:
+    file: lib/Sisimai/Reason/Blocked.pm
+  Sisimai::Reason::ContentError:
+    file: lib/Sisimai/Reason/ContentError.pm
+  Sisimai::Reason::ExceedLimit:
+    file: lib/Sisimai/Reason/ExceedLimit.pm
+  Sisimai::Reason::Expired:
+    file: lib/Sisimai/Reason/Expired.pm
+  Sisimai::Reason::Filtered:
+    file: lib/Sisimai/Reason/Filtered.pm
+  Sisimai::Reason::HostUnknown:
+    file: lib/Sisimai/Reason/HostUnknown.pm
+  Sisimai::Reason::MailboxFull:
+    file: lib/Sisimai/Reason/MailboxFull.pm
+  Sisimai::Reason::MailerError:
+    file: lib/Sisimai/Reason/MailerError.pm
+  Sisimai::Reason::MesgTooBig:
+    file: lib/Sisimai/Reason/MesgTooBig.pm
+  Sisimai::Reason::NotAccept:
+    file: lib/Sisimai/Reason/NotAccept.pm
+  Sisimai::Reason::OnHold:
+    file: lib/Sisimai/Reason/OnHold.pm
+  Sisimai::Reason::Rejected:
+    file: lib/Sisimai/Reason/Rejected.pm
+  Sisimai::Reason::RelayingDenied:
+    file: lib/Sisimai/Reason/RelayingDenied.pm
+  Sisimai::Reason::SecurityError:
+    file: lib/Sisimai/Reason/SecurityError.pm
+  Sisimai::Reason::Suspend:
+    file: lib/Sisimai/Reason/Suspend.pm
+  Sisimai::Reason::SystemError:
+    file: lib/Sisimai/Reason/SystemError.pm
+  Sisimai::Reason::SystemFull:
+    file: lib/Sisimai/Reason/SystemFull.pm
+  Sisimai::Reason::UserUnknown:
+    file: lib/Sisimai/Reason/UserUnknown.pm
+  Sisimai::Rhost:
+    file: lib/Sisimai/Rhost.pm
+  Sisimai::Rhost::GoogleApps:
+    file: lib/Sisimai/Rhost/GoogleApps.pm
+  Sisimai::String:
+    file: lib/Sisimai/String.pm
+  Sisimai::Time:
+    file: lib/Sisimai/Time.pm
+requires:
+  Class::Accessor::Lite: 0.05
+  JSON: 2.90
+  Try::Tiny: 0.16
+  perl: 5.010
+version: 4.0.0
+x_contributors:
+  - 'azumakuniyuki <azumakuniyuki@gmail.com>'
