@@ -27,7 +27,7 @@ no_index:
 provides:
   Sisimai:
     file: lib/Sisimai.pm
-    version: v4.0.0
+    version: v4.0.1
   Sisimai::ARF:
     file: lib/Sisimai/ARF.pm
   Sisimai::Address:
@@ -501,6 +501,6 @@ requires:
   JSON: 2.90
   Try::Tiny: 0.16
   perl: 5.010
-version: 4.0.0
+version: 4.0.1
 x_contributors:
   - 'azumakuniyuki <azumakuniyuki@gmail.com>'
