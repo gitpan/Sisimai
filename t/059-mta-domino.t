@@ -1,9 +1,9 @@
 use strict;
 use Test::More;
 use lib qw(./lib ./blib/lib);
-use Sisimai::MTA::Fallback;
+use Sisimai::MTA::Domino;
 
-my $PackageName = 'Sisimai::MTA::Fallback';
+my $PackageName = 'Sisimai::MTA::Domino';
 my $MethodNames = {
     'class' => [ 
         'version', 'description', 'headerlist', 'scan',
@@ -33,7 +33,7 @@ MAKE_TEST: {
 
     PARSE_EACH_MAIL: for my $n ( 1..10 ) {
 
-        my $emailfn = sprintf( "./eg/maildir-as-a-sample/new/fallback-%d.eml", $n );
+        my $emailfn = sprintf( "./eg/maildir-as-a-sample/new/domino-%d.eml", $n );
         my $mailbox = Sisimai::Mail->new( $emailfn );
         next unless defined $mailbox;
 
@@ -47,17 +47,19 @@ MAKE_TEST: {
             ok length $p->from;
 
             for my $e ( @{ $p->ds } ) {
-                ok defined $e->{'spec'}, '->spec = '.$e->{'spec'};
+                is $e->{'spec'}, 'SMTP', '->spec = SMTP';
                 ok length $e->{'recipient'}, '->recipient = '.$e->{'recipient'};
                 like $e->{'status'}, qr/\d[.]\d[.]\d+/, '->status = '.$e->{'status'};
+                ok defined $e->{'reason'}, '->reason = '.$e->{'reason'};
+                is $e->{'feedbacktype'}, '', '->feedbacktype = ""';
                 ok defined $e->{'command'}, '->command = '.$e->{'command'};
                 ok length $e->{'date'}, '->date = '.$e->{'date'};
                 ok length $e->{'diagnosis'}, '->diagnosis = '.$e->{'diagnosis'};
-                ok defined $e->{'action'}, '->action = '.$e->{'action'};
+                ok length $e->{'action'}, '->action = '.$e->{'action'};
                 ok defined $e->{'rhost'}, '->rhost = '.$e->{'rhost'};
-                ok defined $e->{'lhost'}, '->lhost = '.$e->{'lhost'};
-                ok defined $e->{'feedbacktype'}, '->feedbacktype = ""';
-                ok $e->{'agent'}, '->agent = '.$e->{'agent'};
+                ok length $e->{'lhost'}, '->lhost = '.$e->{'lhost'};
+                ok defined $e->{'alias'}, '->alias = '.$e->{'alias'};
+                is $e->{'agent'}, 'Domino', '->agent = '.$e->{'agent'};
             }
         }
     }

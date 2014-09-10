@@ -1,35 +1,31 @@
-package Sisimai::MTA::Sendmail;
-use parent 'Sisimai::MTA';
+package Sisimai::MSP::US::AmazonSES;
+use parent 'Sisimai::MSP';
 use feature ':5.10';
 use strict;
 use warnings;
 
-# Error text regular expressions which defined in sendmail/savemail.c
-#   savemail.c:1040|if (printheader && !putline("   ----- Transcript of session follows -----\n",
-#   savemail.c:1041|          mci))
-#   savemail.c:1042|  goto writeerr;
-#
-my $RxMTA = {
-    'from'    => qr/\AMail Delivery Subsystem/,
-    'begin'   => qr/\A\s+[-]+ Transcript of session follows [-]+\z/,
-    'error'   => qr/\A[.]+ while talking to .+[:]\z/,
-    'rfc822'  => [
-        qr|\AContent-Type: message/rfc822\z|,
-        qr|\AContent-Type: text/rfc822-headers\z|,
-    ],
+# http://aws.amazon.com/ses/
+my $RxMSP = {
+	'from'    => qr/\AMAILER-DAEMON[@]email[-]bounces[.]amazonses[.]com\z/,
+	'begin'   => qr/\AThe following message to [<]/,
+	'rfc822'  => qr|\Acontent-type: message/rfc822\z|,
     'endof'   => qr/\A__END_OF_EMAIL_MESSAGE__\z/,
-    'subject' => [
-        qr/see transcript for details\z/,
-        qr/\AWarning: /,
-    ],
+	'subject' => qr/\ADelivery Status Notification [(]Failure[)]\z/,
 };
 
-sub version     { '4.0.1' }
-sub description { 'V8Sendmail: /usr/sbin/sendmail' }
-sub smtpagent   { 'Sendmail' }
+my $RxErr = {
+	'expired' => [
+		qr/Delivery expired/,
+	],
+};
+
+sub version     { '4.0.0' }
+sub description { 'AmazonSES: http://aws.amazon.com/ses/' };
+sub smtpagent   { 'US::AmazonSES' }
+sub headerlist  { return [ 'X-AWS-Outgoing' ] }
 
 sub scan {
-    # @Description  Detect an error from Sendmail
+    # @Description  Detect an error from Amazon SES
     # @Param <ref>  (Ref->Hash) Message header
     # @Param <ref>  (Ref->String) Message body
     # @Return       (Ref->Hash) Bounce data list and message/rfc822 part
@@ -37,8 +33,9 @@ sub scan {
     my $mhead = shift // return undef;
     my $mbody = shift // return undef;
 
-    return undef unless grep { $mhead->{'subject'} =~ $_ } @{ $RxMTA->{'subject'} };
-    return undef unless $mhead->{'from'} =~ $RxMTA->{'from'};
+    return undef unless $mhead->{'x-aws-outgoing'};
+    return undef unless $mhead->{'subject'} =~ $RxMSP->{'subject'};
+    return undef unless $mhead->{'from'}    =~ $RxMSP->{'from'};
 
     my $dscontents = [];    # (Ref->Array) SMTP session errors: message/delivery-status
     my $rfc822head = undef; # (Ref->Array) Required header list in message/rfc822 part
@@ -47,11 +44,9 @@ sub scan {
 
     my $stripedtxt = [ split( "\n", $$mbody ) ];
     my $recipients = 0;     # (Integer) The number of 'Final-Recipient' header
-    my $rcptintext = '';    # (String) Recipient address in the message body
-    my $commandtxt = '';    # (String) SMTP Command name begin with the string '>>>'
+    my $softbounce = 0;     # (Integer) 1 = Soft bounce
     my $connvalues = 0;     # (Integer) Flag, 1 if all the value of $connheader have been set
     my $connheader = {
-        'date'    => '',    # The value of Arrival-Date header
         'rhost'   => '',    # The value of Reporting-MTA header
     };
 
@@ -60,9 +55,13 @@ sub scan {
     push @$dscontents, __PACKAGE__->DELIVERYSTATUS;
     $rfc822head = __PACKAGE__->RFC822HEADERS;
 
+    require Sisimai::RFC5322;
+
     for my $e ( @$stripedtxt ) {
-        # Read each line between $RxMTA->{'begin'} and $RxMTA->{'rfc822'}.
-        if( ( grep { $e =~ $_ } @{ $RxMTA->{'rfc822'} } ) .. ( $e =~ $RxMTA->{'endof'} ) ) {
+        # Read each line between $RxMSP->{'begin'} and $RxMSP->{'rfc822'}.
+        $e =~ s{=\d+\z}{};
+
+        if( ( $e =~ $RxMSP->{'rfc822'} ) .. ( $e =~ $RxMSP->{'endof'} ) ) {
             # After "message/rfc822"
             if( $e =~ m/\A([-0-9A-Za-z]+?)[:][ ]*(.+)\z/ ) {
                 # Get required headers only
@@ -82,17 +81,20 @@ sub scan {
 
         } else {
             # Before "message/rfc822"
-            next unless ( $e =~ $RxMTA->{'begin'} ) .. ( grep { $e =~ $_ } @{ $RxMTA->{'rfc822'} } );
+            next unless ( $e =~ $RxMSP->{'begin'} ) .. ( $e =~ $RxMSP->{'rfc822'} );
             next unless length $e;
 
             if( $connvalues == scalar( keys %$connheader ) ) {
-                # Final-Recipient: RFC822; userunknown@example.jp
-                # X-Actual-Recipient: RFC822; kijitora@example.co.jp
+                # Final-Recipient: rfc822;kijitora@example.jp
                 # Action: failed
-                # Status: 5.1.1
-                # Remote-MTA: DNS; mx.example.jp
-                # Diagnostic-Code: SMTP; 550 5.1.1 <userunknown@example.jp>... User Unknown
-                # Last-Attempt-Date: Fri, 14 Feb 2014 12:30:08 -0500
+                # Status: 5.0.0 (permanent failure)
+                # Remote-MTA: dns; [192.0.2.9]
+                # Diagnostic-Code: smtp; 5.1.0 - Unknown address error 550-'5.7.1 
+                #  <000001321defbd2a-788e31c8-2be1-422f-a8d4-cf7765cc9ed7-000000@email-bounces.amazonses.com>...
+                #  Access denied' (delivery attempts: 0)
+                #
+                # --JuU8e.4gyIcCrxq.1RFbQY.3Vu7Hs+
+                # content-type: message/rfc822
                 $v = $dscontents->[ -1 ];
 
                 if( $e =~ m/\AFinal-Recipient:[ ]*rfc822;[ ]*([^ ]+)\z/i ) {
@@ -118,6 +120,7 @@ sub scan {
                     # Status:5.2.0
                     # Status: 5.1.0 (permanent failure)
                     $v->{'status'} = $1;
+                    $softbounce = 0 if $e =~ m/[(]permanent failure[)]/;
 
                 } elsif( $e =~ m/\ARemote-MTA:[ ]*dns;[ ]*(.+)\z/i ) {
                     # Remote-MTA: DNS; mx.example.jp
@@ -142,35 +145,20 @@ sub scan {
                 }
 
             } else {
-                # ----- Transcript of session follows -----
-                # ... while talking to mta.example.org.:
-                # >>> DATA
-                # <<< 550 Unknown user recipient@example.jp
-                # 554 5.0.0 Service unavailable
-                # ...
-                # Reporting-MTA: dns; mx.example.jp
-                # Received-From-MTA: DNS; x1x2x3x4.dhcp.example.ne.jp
-                # Arrival-Date: Wed, 29 Apr 2009 16:03:18 +0900
-                if( $e =~ m/\A[>]{3}[ ]+([A-Z]{4})[ ]?/ ) {
-                    # >>> DATA
-                    $commandtxt = $1;
-
-                } elsif( $e =~ m/\AReporting-MTA:[ ]*dns;[ ]*(.+)\z/i ) {
+                # The following message to <kijitora@example.jp> was undeliverable.
+                # The reason for the problem:
+                # 5.1.0 - Unknown address error 550-'5.7.1 <0000000000000000-00000000-0000-00=
+                # 00-0000-000000000000-000000@email-bounces.amazonses.com>... Access denied'
+                #
+                # --JuU8e.4gyIcCrxq.1RFbQY.3Vu7Hs+
+                # content-type: message/delivery-status
+                #
+                # Reporting-MTA: dns; a192-79.smtp-out.amazonses.com
+                #
+                if( $e =~ m/\AReporting-MTA:[ ]*dns;[ ]*(.+)\z/ ) {
                     # Reporting-MTA: dns; mx.example.jp
                     next if length $connheader->{'rhost'};
                     $connheader->{'rhost'} = $1;
-                    $connvalues++;
-
-                } elsif( $e =~ m/\AReceived-From-MTA:[ ]*dns;[ ]*(.+)\z/i ) {
-                    # Received-From-MTA: DNS; x1x2x3x4.dhcp.example.ne.jp
-                    next if length $connheader->{'lhost'};
-                    $connheader->{'lhost'} = $1;
-                    $connvalues++;
-
-                } elsif( $e =~ m/\AArrival-Date:[ ]*(.+)\z/i ) {
-                    # Arrival-Date: Wed, 29 Apr 2009 16:03:18 +0900
-                    next if length $connheader->{'date'};
-                    $connheader->{'date'} = $1;
                     $connvalues++;
                 }
             }
@@ -184,13 +172,12 @@ sub scan {
 
     return undef unless $recipients;
     require Sisimai::String;
+    require Sisimai::RFC3463;
     require Sisimai::RFC5322;
 
     for my $e ( @$dscontents ) {
         # Set default values if each value is empty.
-        for my $f ( 'date', 'lhost', 'rhost' ) {
-            $e->{ $f } ||= $connheader->{ $f } || '';
-        }
+        $e->{'date'} ||= $mhead->{'date'};
 
         if( scalar @{ $mhead->{'received'} } ) {
             # Get localhost and remote host name from Received header.
@@ -199,10 +186,36 @@ sub scan {
             $e->{'rhost'} ||= pop @{ Sisimai::RFC5322->received( $r->[-1] ) };
         }
 
+        $e->{'diagnosis'} =~ s{\\n}{ }g;
+        $e->{'diagnosis'} =  Sisimai::String->sweep( $e->{'diagnosis'} );
+
+        if( $e->{'status'} =~ m/\A[45][.][01][.]0\z/ ) {
+            # Get other D.S.N. value from the error message
+            my $r = '';
+            my $x = $e->{'diagnosis'};
+
+            if( $e->{'diagnosis'} =~ m/["'](\d[.]\d[.]\d.+)['"]/ ) {
+                # 5.1.0 - Unknown address error 550-'5.7.1 ...
+                $x = $1;
+            }
+
+            $r = Sisimai::RFC3463->getdsn( $x );
+            $e->{'status'} = $r if length $r;
+        }
+
+        SESSION: for my $r ( keys %$RxErr ) {
+            # Verify each regular expression of session errors
+            PATTERN: for my $rr ( @{ $RxErr->{ $r } } ) {
+                # Check each regular expression
+                next unless $e->{'diagnosis'} =~ $rr;
+                $e->{'reason'} = $r;
+                last(SESSION);
+            }
+        }
+
+        $e->{'reason'}  ||= Sisimai::RFC3463->reason( $e->{'status'} );
         $e->{'spec'}    ||= 'SMTP';
         $e->{'agent'}   ||= __PACKAGE__->smtpagent;
-        $e->{'command'} ||= $commandtxt || 'CONN';
-        $e->{'diagnosis'} = Sisimai::String->sweep( $e->{'diagnosis'} );
     }
     return { 'ds' => $dscontents, 'rfc822' => $rfc822part };
 }
@@ -214,15 +227,15 @@ __END__
 
 =head1 NAME
 
-Sisimai::MTA::Sendmail - bounce mail parser class for v8 Sendmail.
+Sisimai::MSP::US::AmazonSES - bounce mail parser class for Amazon SES.
 
 =head1 SYNOPSIS
 
-    use Sisimai::MTA::Sendmail;
+    use Sisimai::MSP::US::AmazonSES;
 
 =head1 DESCRIPTION
 
-Sisimai::MTA::Sendmail parses a bounce email which created by v8 Sendmail.
+Sisimai::MSP::US::AmazonSES parses a bounce email which created by Amazon SES.
 Methods in the module are called from only Sisimai::Message.
 
 =head1 CLASS METHODS
@@ -231,19 +244,19 @@ Methods in the module are called from only Sisimai::Message.
 
 C<version()> returns the version number of this module.
 
-    print Sisimai::MTA::Sendmail->version;
+    print Sisimai::MSP::US::AmazonSES->version;
 
 =head2 C<B<description()>>
 
 C<description()> returns description string of this module.
 
-    print Sisimai::MTA::Sendmail->description;
+    print Sisimai::MSP::US::AmazonSES->description;
 
 =head2 C<B<smtpagent()>>
 
 C<smtpagent()> returns MTA name.
 
-    print Sisimai::MTA::Sendmail->smtpagent;
+    print Sisimai::MSP::US::AmazonSES->smtpagent;
 
 =head2 C<B<scan( I<header data>, I<reference to body string>)>>
 

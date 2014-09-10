@@ -27,7 +27,7 @@ no_index:
 provides:
   Sisimai:
     file: lib/Sisimai.pm
-    version: v4.0.1
+    version: v4.0.2
   Sisimai::ARF:
     file: lib/Sisimai/ARF.pm
   Sisimai::Address:
@@ -416,18 +416,20 @@ provides:
     file: lib/Sisimai/MSP/US/Facebook.pm
   Sisimai::MSP::US::Google:
     file: lib/Sisimai/MSP/US/Google.pm
+  Sisimai::MSP::US::SendGrid:
+    file: lib/Sisimai/MSP/US/SendGrid.pm
   Sisimai::MSP::US::Verizon:
     file: lib/Sisimai/MSP/US/Verizon.pm
   Sisimai::MTA:
     file: lib/Sisimai/MTA.pm
   Sisimai::MTA::Courier:
     file: lib/Sisimai/MTA/Courier.pm
+  Sisimai::MTA::Domino:
+    file: lib/Sisimai/MTA/Domino.pm
   Sisimai::MTA::Exchange:
     file: lib/Sisimai/MTA/Exchange.pm
   Sisimai::MTA::Exim:
     file: lib/Sisimai/MTA/Exim.pm
-  Sisimai::MTA::Fallback:
-    file: lib/Sisimai/MTA/Fallback.pm
   Sisimai::MTA::OpenSMTPD:
     file: lib/Sisimai/MTA/OpenSMTPD.pm
   Sisimai::MTA::Postfix:
@@ -448,6 +450,8 @@ provides:
     file: lib/Sisimai/RFC2606.pm
   Sisimai::RFC3463:
     file: lib/Sisimai/RFC3463.pm
+  Sisimai::RFC3464:
+    file: lib/Sisimai/RFC3464.pm
   Sisimai::RFC5322:
     file: lib/Sisimai/RFC5322.pm
   Sisimai::Reason:
@@ -501,6 +505,6 @@ requires:
   JSON: 2.90
   Try::Tiny: 0.16
   perl: 5.010
-version: 4.0.1
+version: 4.0.2
 x_contributors:
   - 'azumakuniyuki <azumakuniyuki@gmail.com>'

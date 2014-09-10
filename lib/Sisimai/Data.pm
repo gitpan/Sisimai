@@ -3,6 +3,10 @@ use feature ':5.10';
 use strict;
 use warnings;
 use Class::Accessor::Lite;
+use Module::Load;
+use Time::Piece;
+use Try::Tiny;
+
 use Sisimai::Address;
 use Sisimai::RFC5322;
 use Sisimai::String;
@@ -10,9 +14,6 @@ use Sisimai::Reason;
 use Sisimai::Group;
 use Sisimai::Rhost;
 use Sisimai::Time;
-use Module::Load;
-use Time::Piece;
-use Try::Tiny;
 
 my $rwaccessors = [
     'date',             # (Time::Piece) Date: in the original message
@@ -233,9 +234,17 @@ sub make {
         next unless $p->{'date'};
 
         OTHER_TEXT_HEADERS: {
-            $p->{'listid'}    = $rfc822data->{'list-id'}    // '';
-            $p->{'subject'}   = $rfc822data->{'subject'}    // '';
-            $p->{'messageid'} = $rfc822data->{'message-id'} // '';
+            # Remove square brackets and curly brackets from the host variable
+            map { $p->{ $_ } =~ y/[]()//d } ( 'rhost', 'lhost' );
+            $p->{'subject'} = $rfc822data->{'subject'} // '';
+
+            # The value of "List-Id" header
+            $p->{'listid'} =  $rfc822data->{'list-id'} // '';
+            $p->{'listid'} =~ y/<>//d if length $p->{'listid'};
+
+            # The value of "Message-Id" header
+            $p->{'messageid'} =  $rfc822data->{'message-id'} // '';
+            $p->{'messageid'} =~ y/<>//d if length $p->{'messageid'};
         }
 
         CLASSIFICATION: {

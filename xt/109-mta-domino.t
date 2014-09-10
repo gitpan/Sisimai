@@ -1,10 +1,10 @@
 use strict;
 use Test::More;
 use lib qw(./lib ./blib/lib);
-use Sisimai::ARF;
+use Sisimai::MTA::Domino;
 
-my $c = 'Sisimai::ARF';
-my $d = './tmp/data/arf';
+my $c = 'Sisimai::MTA::Domino';
+my $d = './tmp/data/domino';
 my $h = undef;
 use_ok $c;
 
@@ -70,9 +70,9 @@ if( -d $d ) {
                 is $t->host, $f->destination, sprintf( "(%s) destination = %s", $e, $f->destination );
 
                 like $f->timezoneoffset, qr/\A[+-]\d+\z/, sprintf( "(%s) timezoneoffset = %s", $e, $f->timezoneoffset );
-                ok length $f->smtpagent, sprintf( "(%s) smtpagent = %s", $e, $f->smtpagent );
+                is $f->smtpagent, [ split( '::', $c ) ]->[-1], sprintf( "(%s) smtpagent = %s", $e, $f->smtpagent );
 
-                ok defined $f->feedbacktype, sprintf( "(%s) feedbacktype = %s", $e,$f->feedbacktype );
+                ok defined $f->feedbacktype, sprintf( "(%s) feedbacktype = ''", $e );
                 ok defined $f->subject;
             }
         }
@@ -81,4 +81,5 @@ if( -d $d ) {
 }
 
 done_testing;
+
 

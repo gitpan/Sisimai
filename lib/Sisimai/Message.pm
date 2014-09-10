@@ -23,6 +23,7 @@ my $DefaultMTA = [
     'Exim',
     'Courier',
     'Exchange',
+    'Domino',
 ];
 
 my $DefaultMSP = [
@@ -31,6 +32,8 @@ my $DefaultMSP = [
     'US::Facebook',
     'JP::KDDI',
     'JP::Biglobe',
+    'US::AmazonSES',
+    'US::SendGrid',
 ];
 
 sub ENDOFEMAIL { '__END_OF_EMAIL_MESSAGE__' };
@@ -315,6 +318,13 @@ sub rewrite {
     my $mailheader = $mesgentity->{'header'};
     my $scannedset = undef;
 
+    FALLBACK_FOR_EACH_HEADER: {
+        # Set empty string if the value is undefined
+        $mailheader->{'from'}         //= '';
+        $mailheader->{'subject'}      //= '';
+        $mailheader->{'content-type'} //= '';
+    }
+
     EXPAND_FORWARDED_MESSAGE: {
         # Check whether or not the message is a bounce mail.
         # Pre-Process email body if it is a forwarded bounce message.
@@ -328,7 +338,11 @@ sub rewrite {
     }
 
     SCANNER: while(1) {
-
+        # 1. Sisimai::ARF 
+        # 2. Sisimai::MTA::*
+        # 3. Sisimai::MSP::*
+        # 4. Sisimai::RFc3464
+        #
         if( Sisimai::ARF->is_arf( $mailheader->{'content-type'} ) ) {
             # Feedback Loop message
             $scannedset = Sisimai::ARF->scan( $mailheader, $bodystring );
@@ -354,9 +368,10 @@ sub rewrite {
         last(SCANNER) if $scannedset;
 
         # When the all of Sisimai::MTA::* modules did not return bounce data,
-        # call Sisimai::MTA::Fallback
-        require Sisimai::MTA::Fallback;
-        $scannedset = Sisimai::MTA::Fallback->scan( $mailheader, $bodystring );
+        # call Sisimai::RFC3464;
+        #
+        require Sisimai::RFC3464;
+        $scannedset = Sisimai::RFC3464->scan( $mailheader, $bodystring );
         last(SCANNER) if $scannedset;
 
         # as of now, we have no sample email for coding this block

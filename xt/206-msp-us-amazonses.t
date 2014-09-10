@@ -1,10 +1,10 @@
 use strict;
 use Test::More;
 use lib qw(./lib ./blib/lib);
-use Sisimai::ARF;
+use Sisimai::MSP::US::AmazonSES;
 
-my $c = 'Sisimai::ARF';
-my $d = './tmp/data/arf';
+my $c = 'Sisimai::MSP::US::AmazonSES';
+my $d = './tmp/data/us-amazonses';
 my $h = undef;
 use_ok $c;
 
@@ -32,15 +32,14 @@ if( -d $d ) {
             for my $f ( @$v ) {
                 isa_ok $f, 'Sisimai::Data';
 
-                ok length $f->token, sprintf( "(%s) token = %s", $e, $f->token );
                 ok defined $f->lhost, sprintf( "(%s) lhost = %s", $e, $f->lhost );
                 ok defined $f->rhost, sprintf( "(%s) rhost = %s", $e, $f->rhost );
-
                 ok defined $f->listid, sprintf( "(%s) listid = %s", $e, $f->listid );
                 ok defined $f->alias, sprintf( "(%s) alias = %s", $e, $f->alias );
 
-                ok defined $f->deliverystatus, sprintf( "(%s) deliverystatus = %s", $e, $f->deliverystatus );
+                ok length $f->deliverystatus, sprintf( "(%s) deliverystatus = %s", $e, $f->deliverystatus );
                 ok length $f->reason, sprintf( "(%s) reason = %s", $e, $f->reason );
+                ok length $f->token, sprintf( "(%s) token = %s", $e, $f->token );
 
                 isa_ok $f->date, 'Time::Piece';
                 $t = $f->date;
@@ -70,9 +69,8 @@ if( -d $d ) {
                 is $t->host, $f->destination, sprintf( "(%s) destination = %s", $e, $f->destination );
 
                 like $f->timezoneoffset, qr/\A[+-]\d+\z/, sprintf( "(%s) timezoneoffset = %s", $e, $f->timezoneoffset );
-                ok length $f->smtpagent, sprintf( "(%s) smtpagent = %s", $e, $f->smtpagent );
+                is $f->smtpagent, [ split( '::', $c ) ]->[-2].'::'.[ split( '::', $c ) ]->[-1], sprintf( "(%s) smtpagent = %s", $e, $f->smtpagent );
 
-                ok defined $f->feedbacktype, sprintf( "(%s) feedbacktype = %s", $e,$f->feedbacktype );
                 ok defined $f->subject;
             }
         }

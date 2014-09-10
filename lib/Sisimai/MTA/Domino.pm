@@ -1,38 +1,36 @@
-package Sisimai::MSP::JP::Biglobe;
-use parent 'Sisimai::MSP';
+package Sisimai::MTA::Domino;
+use parent 'Sisimai::MTA';
 use feature ':5.10';
 use strict;
 use warnings;
 
-my $RxMSP = {
-    'begin'   => qr/\A   ----- The following addresses had delivery problems -----\z/,
-    'error'   => qr/\A   ----- Non-delivered information -----\z/,
-    'rfc822'  => qr|\AContent-Type: message/rfc822\z|,
-    'endof'   => qr/\A__END_OF_EMAIL_MESSAGE__\z/,
-    'subject' => qr/\AReturned mail:/,
-    'from'    => [
-        'postmaster@biglobe.ne.jp',
-        'postmaster@inacatv.ne.jp',
-        'postmaster@tmtv.ne.jp',
-        'postmaster@ttv.ne.jp',
-    ],
+my $RxMTA = {
+    'begin'     => qr/\AYour message/,
+    'rfc822'    => qr|\AContent-Type: message/delivery-status\z|,
+    'endof'     => qr/\A__END_OF_EMAIL_MESSAGE__\z/,
+    'subject'   => qr/\ADELIVERY FAILURE:/,
 };
 
 my $RxErr = {
-    'filtered' => [
-        qr/Mail Delivery Failed[.]+ User unknown/,
+    'userunknown' => [
+        qr/not listed in Domino Directory/,
+        qr/not listed in public Name & Address Book/,
+        qr/Domino ディレクトリには見つかりません/,
     ],
-    'mailboxfull' => [
-        qr/The number of messages in recipient's mailbox exceeded the local limit[.]/,
+    'filtered' => [
+        qr/Cannot route mail to user/,
+    ],
+    'systemerror' => [
+        qr/Several matches found in Domino Directory/,
     ],
 };
 
-sub version     { '4.0.1' }
-sub description { 'Biglobe' }
-sub smtpagent   { 'JP::Biglobe' }
+sub version     { '4.0.0' }
+sub description { 'IBM Domino' }
+sub smtpagent   { 'Domino' }
 
 sub scan {
-    # @Description  Detect an error from Biglobe
+    # @Description  Detect an error from IBM Domino
     # @Param <ref>  (Ref->Hash) Message header
     # @Param <ref>  (Ref->String) Message body
     # @Return       (Ref->Hash) Bounce data list and message/rfc822 part
@@ -40,8 +38,7 @@ sub scan {
     my $mhead = shift // return undef;
     my $mbody = shift // return undef;
 
-    return undef unless grep { $mhead->{'from'} eq $_ } @{ $RxMSP->{'from'} };
-    return undef unless $mhead->{'subject'} =~ $RxMSP->{'subject'};
+    return undef unless $mhead->{'subject'} =~ $RxMTA->{'subject'};
 
     my $dscontents = [];    # (Ref->Array) SMTP session errors: message/delivery-status
     my $rfc822head = undef; # (Ref->Array) Required header list in message/rfc822 part
@@ -50,19 +47,20 @@ sub scan {
 
     my $stripedtxt = [ split( "\n", $$mbody ) ];
     my $recipients = 0;     # (Integer) The number of 'Final-Recipient' header
-    my $softbounce = 0;     # (Integer) 1 = Soft bounce
+    my $subjecttxt = '';    # (String) The value of Subject:
 
     my $v = undef;
     my $p = undef;
     push @$dscontents, __PACKAGE__->DELIVERYSTATUS;
     $rfc822head = __PACKAGE__->RFC822HEADERS;
 
-    require Sisimai::RFC5322;
     require Sisimai::Address;
 
     for my $e ( @$stripedtxt ) {
-        # Read each line between $RxMSP->{'begin'} and $RxMSP->{'rfc822'}.
-        if( ( $e =~ $RxMSP->{'rfc822'} ) .. ( $e =~ $RxMSP->{'endof'} ) ) {
+        # Read each line between $RxMTA->{'begin'} and $RxMTA->{'rfc822'}.
+        next unless length $e;
+
+        if( ( $e =~ $RxMTA->{'rfc822'} ) .. ( $e =~ $RxMTA->{'endof'} ) ) {
             # After "message/rfc822"
             if( $e =~ m/\A([-0-9A-Za-z]+?)[:][ ]*(.+)\z/ ) {
                 # Get required headers only
@@ -82,46 +80,50 @@ sub scan {
 
         } else {
             # Before "message/rfc822"
-            next unless ( $e =~ $RxMSP->{'begin'} ) .. ( $e =~ $RxMSP->{'rfc822'} );
-            next unless length $e;
-
-            # This is a MIME-encapsulated message.
+            next unless ( $e =~ $RxMTA->{'begin'} ) .. ( $e =~ $RxMTA->{'rfc822'} );
+            # Your message
             #
-            # ----_Biglobe000000/00000.biglobe.ne.jp
-            # Content-Type: text/plain; charset="iso-2022-jp"
+            #   Subject: Test Bounce
             #
-            #    ----- The following addresses had delivery problems -----
-            # ********@***.biglobe.ne.jp
+            # was not delivered to:
             #
-            #    ----- Non-delivered information -----
-            # The number of messages in recipient's mailbox exceeded the local limit.
+            #   kijitora@example.net
             #
-            # ----_Biglobe000000/00000.biglobe.ne.jp
-            # Content-Type: message/rfc822
+            # because:
+            #
+            #   User some.name (kijitora@example.net) not listed in Domino Directory
             #
             $v = $dscontents->[ -1 ];
-
-            if( $e =~ m/\A([^ ]+[@][^ ]+)\z/ ) {
-                #    ----- The following addresses had delivery problems -----
-                # ********@***.biglobe.ne.jp
+            if( $e =~ m/\Awas not delivered to:\z/ ) {
+                # was not delivered to:
                 if( length $v->{'recipient'} ) {
                     # There are multiple recipient addresses in the message body.
                     push @$dscontents, __PACKAGE__->DELIVERYSTATUS;
                     $v = $dscontents->[ -1 ];
                 }
+                $v->{'recipient'} ||= $e;
+                $recipients++;
 
-                my $r = Sisimai::Address->s3s4( $1 );
-                if( Sisimai::RFC5322->is_emailaddress( $r ) ) {
-                    $v->{'recipient'} = $r;
-                    $recipients++;
-                }
+            } elsif( $e =~ m/\A\s\s([^ ]+[@][^ ]+)\z/ ) {
+                # Continued from the line "was not delivered to:"
+                #   kijitora@example.net
+                $v->{'recipient'} = Sisimai::Address->s3s4( $1 );
+
+            } elsif( $e =~ m/\Abecause:\z/ ) {
+                # because:
+                $v->{'diagnosis'} = $e;
 
             } else {
 
-                next if $e =~ m/\A[^\w]/;
-                $v->{'diagnosis'} .= $e.' ';
-            }
+                if( exists $v->{'diagnosis'} && $v->{'diagnosis'} eq 'because:' ) {
+                    # Error message, continued from the line "because:"
+                    $v->{'diagnosis'} = $e;
 
+                } elsif( $e =~ m/\A\s\sSubject: (.+)\z/ ) {
+                    #   Subject: Nyaa
+                    $subjecttxt = $1;
+                }
+            }
         } # End of if: rfc822
 
     } continue {
@@ -129,10 +131,11 @@ sub scan {
         $p = $e;
         $e = undef;
     }
-
     return undef unless $recipients;
+
     require Sisimai::String;
     require Sisimai::RFC3463;
+    require Sisimai::RFC5322;
 
     for my $e ( @$dscontents ) {
         # Set default values if each value is empty.
@@ -146,36 +149,24 @@ sub scan {
             $e->{'rhost'} ||= pop @{ Sisimai::RFC5322->received( $r->[-1] ) };
         }
         $e->{'diagnosis'} = Sisimai::String->sweep( $e->{'diagnosis'} );
+        $e->{'recipient'} = Sisimai::Address->s3s4( $e->{'recipient'} );
 
-        SESSION: for my $r ( keys %$RxErr ) {
-            # Verify each regular expression of session errors
-            PATTERN: for my $rr ( @{ $RxErr->{ $r } } ) {
-                # Check each regular expression
-                next(PATTERN) unless $e->{'diagnosis'} =~ $rr;
-                $e->{'reason'} = $r;
-                last(SESSION);
-            }
-        }
-
-        $e->{'status'} = Sisimai::RFC3463->getdsn( $e->{'diagnosis'} );
-        STATUS_CODE: while(1) {
-            last if length $e->{'status'};
-
-            if( $e->{'reason'} ) {
-                # Set pseudo status code
-                $softbounce = 1 if Sisimai::RFC3463->is_softbounce( $e->{'diagnosis'} );
-                my $s = $softbounce ? 't' : 'p';
-                my $r = Sisimai::RFC3463->status( $e->{'reason'}, $s, 'i' );
-                $e->{'status'} = $r if length $r;
-            }
-
-            $e->{'status'} ||= $softbounce ? '4.0.0' : '5.0.0';
+        for my $r ( keys %$RxErr ) {
+            # Check each regular expression of Domino error messages
+            next unless grep { $e->{'diagnosis'} =~ $_ } @{ $RxErr->{ $r } };
+            $e->{'reason'} = $r;
+            my $s = Sisimai::RFC3463->status( $r, 'p', 'i' );
+            $e->{'status'} = $s if length $s;
             last;
         }
 
         $e->{'spec'} = $e->{'reason'} eq 'mailererror' ? 'X-UNIX' : 'SMTP';
         $e->{'action'} = 'failed' if $e->{'status'} =~ m/\A[45]/;
-        $e->{'command'} ||= 'CONN';
+
+        unless( $rfc822part =~ m/\bSubject:/ ) {
+            # Fallback: Add the value of Subject as a Subject header
+            $rfc822part .= sprintf( "Subject: %s\n", $subjecttxt );
+        }
 
     } # end of for()
 
@@ -189,15 +180,15 @@ __END__
 
 =head1 NAME
 
-Sisimai::MSP::JP::Biglobe - bounce mail parser class for Biglobe.
+Sisimai::MTA::Domino - bounce mail parser class for IBM Domino Server.
 
 =head1 SYNOPSIS
 
-    use Sisimai::MSP::JP::Biglobe;
+    use Sisimai::MTA::Domino;
 
 =head1 DESCRIPTION
 
-Sisimai::MSP::JP::Biglobe parses a bounce email which created by Biglobe.
+Sisimai::MTA::Domino parses a bounce email which created by IBM Domino Server. 
 Methods in the module are called from only Sisimai::Message.
 
 =head1 CLASS METHODS
@@ -206,19 +197,19 @@ Methods in the module are called from only Sisimai::Message.
 
 C<version()> returns the version number of this module.
 
-    print Sisimai::MSP::JP::Biglobe->version;
+    print Sisimai::MTA::Domino->version;
 
 =head2 C<B<description()>>
 
 C<description()> returns description string of this module.
 
-    print Sisimai::MSP::JP::Biglobe->description;
+    print Sisimai::MTA::Domino->description;
 
 =head2 C<B<smtpagent()>>
 
 C<smtpagent()> returns MTA name.
 
-    print Sisimai::MSP::JP::Biglobe->smtpagent;
+    print Sisimai::MTA::Domino->smtpagent;
 
 =head2 C<B<scan( I<header data>, I<reference to body string>)>>
 
@@ -239,4 +230,3 @@ All Rights Reserved.
 This software is distributed under The BSD 2-Clause License.
 
 =cut
-

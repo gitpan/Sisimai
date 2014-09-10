@@ -1,4 +1,4 @@
-# Sisimai.mk
+# Sisimai/Makefile
 #  __  __       _         __ _ _      
 # |  \/  | __ _| | _____ / _(_) | ___ 
 # | |\/| |/ _` | |/ / _ \ |_| | |/ _ \
@@ -10,7 +10,6 @@ TIME  = $(shell date '+%s')
 NAME  = Sisimai
 MAKE  = /usr/bin/make
 PERL  = /usr/local/bin/perl
-CURL  = /usr/bin/curl -X POST
 PROVE = /usr/local/bin/prove -Ilib --timer
 MINIL = /usr/local/bin/minil
 CP    = /bin/cp
@@ -31,14 +30,14 @@ cover-test:
 
 release-test:
 	$(CP) ./README.md /tmp/$(NAME)-README.$(TIME).md
-	$(MAKE) -f $(NAME).mk clean
+	$(MAKE) clean
 	$(MINIL) test
 	$(CP) /tmp/$(NAME)-README.$(TIME).md ./README.md
 	$(PERL) -i -ple 's|<.+[@]gmail.com>|<perl.org\@azumakuniyuki.org>|' META.json
 
 dist:
 	$(CP) ./README.md /tmp/$(NAME)-README.$(TIME).md
-	$(MAKE) -f $(NAME).mk clean
+	$(MAKE) clean
 	$(MINIL) dist
 	$(CP) /tmp/$(NAME)-README.$(TIME).md ./README.md
 	$(PERL) -i -ple 's|<.+[@]gmail.com>|<perl.org\@azumakuniyuki.org>|' META.json
