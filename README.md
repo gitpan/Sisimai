@@ -1,3 +1,6 @@
+[![Build Status](https://travis-ci.org/azumakuniyuki/Sisimai.svg?branch=master)](https://travis-ci.org/azumakuniyuki/Sisimai) 
+[![Coverage Status](https://img.shields.io/coveralls/azumakuniyuki/Sisimai.svg)](https://coveralls.io/r/azumakuniyuki/Sisimai)
+
          ____  _     _                 _ 
         / ___|(_)___(_)_ __ ___   __ _(_)
         \___ \| / __| | '_ ` _ \ / _` | |
@@ -24,44 +27,51 @@ version 4 (Sisimai).
 | Command line tools                             | OK            | N/A          |
 | Modules for Commercial MTAs                    | N/A(1)        | Included     |
 | WebUI/API                                      | OK            | N/A          |
+| Database schema for storing parsed bounce data | Available     | N/A(2)       |
 | Parse 2 or more bounces in a single email      | Only 1st rcpt | ALL          |
 | Parse FeedBack Loop Message/ARF format mail    | N/A           | OK           |
+| Classification based on recipient domain       | Available     | N/A          |
 | Easy to install                                | No            | Yes          |
 | Install using cpan or cpanm command            | N/A           | OK           |
 | Dependencies                                   | 24 modules    | 3 modules    |
 | License                                        | GPLv2 or Perl | 2 clause BSD |
 | Support Contract provided by Developer         | Available     | Coming soon  |
 
-(1) bounceHammer-nails
+1. bounceHammer-nails
+2. Implement yourself with using DBI or any O/R Mapper you like
 
 公開中のbouncehammer version 2.7.12とversion 4(シシマイ)は上記のような違いがあります。
 
 | 機能                                           | ver 2.7.X     | Sisimai      |
 |------------------------------------------------|---------------|--------------|
 | コマンドラインツール                           | あり          | 無し         |
-| 商用MTA対応解析モジュール                      | 無し(商用版)  | あり(標準)   |
+| 商用MTA対応解析モジュール                      | 無し(商用版,1)| あり(標準)   |
 | WebUIとAPI                                     | あり          | 無し         |
+| 解析済バウンスデータを保存するDBスキーマ       | あり          | 無し(2)      |
 | 2件以上のバウンスがあるメールの解析            | 1件目だけ     | 全件対応     |
 | FeedBack Loop/ARF形式のメール解析              | 非対応        | 対応済       |
+| 宛先ドメインによる分類項目                     | あり          | 無し         |
 | インストール作業が簡単                         | やや面倒      | 簡単で楽     |
 | cpanまたはcpanmコマンドでのインストール        | 非対応        | 対応済       |
 | 依存モジュール数                               | 24モジュール  | 3モジュール  |
 | ライセンス                                     | GPLv2かPerl   | 二条項BSD    |
 | 開発会社によるサポート契約                     | 提供中        | 準備中       |
 
+1. bounceHammer-nails
+2. DBIまたは好きなORMを使って自由に実装してください
 
 System requirements | 動作環境
 ------------------------------
 
-* Perl 5.10.1 or later
+* [Perl 5.10.1 or later](http://www.perl.org/)
 
 Dependencies | 依存モジュール
 -----------------------------
 Sisimai relies on:
 
-* __Class::Accessor::Lite__
-* __Try::Tiny__
-* __JSON__
+* [__Class::Accessor::Lite__](https://metacpan.org/pod/Class::Accessor::Lite)
+* [__JSON__](https://metacpan.org/pod/JSON)
+* [__Try::Tiny__](https://metacpan.org/pod/Try::Tiny)
 
 Sisimaiは上記のモジュールに依存しています。
 
@@ -122,7 +132,7 @@ WEB SITE | サイト
 
 AUTHOR | 作者
 -------------
-azumakuniyuki
+[@azumakuniyuki](https://twitter.com/azumakuniyuki)
 
 COPYRIGHT | 著作権
 ------------------
