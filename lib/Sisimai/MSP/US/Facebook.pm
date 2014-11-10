@@ -64,7 +64,7 @@ my $RxErr = {
     ],
 };
 
-sub version     { '4.0.2' }
+sub version     { '4.0.6' }
 sub description { 'Facebook' }
 sub smtpagent   { 'US::Facebook' }
 
@@ -83,11 +83,11 @@ sub scan {
     my $dscontents = [];    # (Ref->Array) SMTP session errors: message/delivery-status
     my $rfc822head = undef; # (Ref->Array) Required header list in message/rfc822 part
     my $rfc822part = '';    # (String) message/rfc822-headers part
+    my $rfc822next = { 'from' => 0, 'to' => 0, 'subject' => 0 };
     my $previousfn = '';    # (String) Previous field name
 
     my $stripedtxt = [ split( "\n", $$mbody ) ];
     my $recipients = 0;     # (Integer) The number of 'Final-Recipient' header
-    my $softbounce = 0;     # (Integer) 1 = Soft bounce
     my $fbresponse = '';    # (String) Response code from Facebook
     my $connvalues = 0;     # (Integer) Flag, 1 if all the value of $connheader have been set
     my $connheader = {
@@ -96,7 +96,7 @@ sub scan {
     };
 
     my $v = undef;
-    my $p = undef;
+    my $p = '';
     push @$dscontents, __PACKAGE__->DELIVERYSTATUS;
     $rfc822head = __PACKAGE__->RFC822HEADERS;
 
@@ -117,7 +117,14 @@ sub scan {
 
             } elsif( $e =~ m/\A[\s\t]+/ ) {
                 # Continued line from the previous line
+                next if $rfc822next->{ lc $previousfn };
                 $rfc822part .= $e."\n" if $previousfn =~ m/\A(?:From|To|Subject)\z/;
+
+            } else {
+                # Check the end of headers in rfc822 part
+                next unless $previousfn =~ m/\A(?:From|To|Subject)\z/;
+                next unless $e =~ m/\A\z/;
+                $rfc822next->{ lc $previousfn } = 1;
             }
 
         } else {
@@ -197,7 +204,7 @@ sub scan {
     } continue {
         # Save the current line for the next loop
         $p = $e;
-        $e = undef;
+        $e = '';
     }
 
     return undef unless $recipients;
@@ -207,7 +214,6 @@ sub scan {
 
     for my $e ( @$dscontents ) {
         # Set default values if each value is empty.
-        $e->{'date'}  ||= $connheader->{'date'} || $mhead->{'date'};
         $e->{'agent'} ||= __PACKAGE__->smtpagent;
         $e->{'rhost'} ||= $connheader->{'rhost'};
 
@@ -226,7 +232,7 @@ sub scan {
             my $num = $3;
 
             $fbresponse = sprintf( "%s-%s%d", $lhs, $rhs, $num );
-            $softbounce = $rhs eq 'P' ? 0 : 1;
+            $e->{'softbounce'} = $rhs eq 'P' ? 0 : 1;
         }
 
         SESSION: for my $r ( keys %$RxErr ) {
@@ -240,34 +246,24 @@ sub scan {
         }
 
         unless( $e->{'reason'} ) {
-            # Facebook System Resource Issues
-            # These codes indicate a temporary issue internal to Facebook's 
-            # system. Administrators observing these issues are not required to
-            # take any action to correct them.
+            # http://postmaster.facebook.com/response_codes
+            #   Facebook System Resource Issues
+            #   These codes indicate a temporary issue internal to Facebook's 
+            #   system. Administrators observing these issues are not required to
+            #   take any action to correct them.
             if( $fbresponse =~ m/\AINT-T\d+\z/ ) {
                 # * INT-Tx
+                #
+                # https://groups.google.com/forum/#!topic/cdmix/eXfi4ddgYLQ
+                # This block has not been tested because we have no email sample
+                # including "INT-T?" error code.
                 $e->{'reason'} = 'systemerror';
-                $softbounce = 1;
+                $e->{'softbounce'} = 1;
             }
         }
 
         $e->{'status'} = Sisimai::RFC3463->getdsn( $e->{'diagnosis'} );
-        STATUS_CODE: while(1) {
-            last if length $e->{'status'};
-
-            if( $e->{'reason'} ) {
-                # Set pseudo status code
-                $softbounce = 1 if Sisimai::RFC3463->is_softbounce( $e->{'diagnosis'} );
-                my $s = $softbounce ? 't' : 'p';
-                my $r = Sisimai::RFC3463->status( $e->{'reason'}, $s, 'i' );
-                $e->{'status'} = $r if length $r;
-            }
-
-            $e->{'status'} ||= $softbounce ? '4.0.0' : '5.0.0';
-            last;
-        }
-
-        $e->{'spec'} = $e->{'reason'} eq 'mailererror' ? 'X-UNIX' : 'SMTP';
+        $e->{'spec'}   = $e->{'reason'} eq 'mailererror' ? 'X-UNIX' : 'SMTP';
         $e->{'action'} = 'failed' if $e->{'status'} =~ m/\A[45]/;
 
     } # end of for()

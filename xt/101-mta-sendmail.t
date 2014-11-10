@@ -19,7 +19,7 @@ if( -d $d ) {
 
         my $emailfn = sprintf( "%s/%s", $d, $e );
         my $mailbox = undef;
-        
+
         next unless -f $emailfn;
         $mailbox = Sisimai::Mail->new( $emailfn );
 
@@ -33,8 +33,8 @@ if( -d $d ) {
                 isa_ok $f, 'Sisimai::Data';
 
                 ok length $f->token, sprintf( "(%s) token = %s", $e, $f->token );
-                ok length $f->lhost, sprintf( "(%s) lhost = %s", $e, $f->lhost );
-                ok length $f->rhost, sprintf( "(%s) rhost = %s", $e, $f->rhost );
+                ok defined $f->lhost, sprintf( "(%s) lhost = %s", $e, $f->lhost );
+                ok defined $f->rhost, sprintf( "(%s) rhost = %s", $e, $f->rhost );
 
                 ok defined $f->listid, sprintf( "(%s) listid = %s", $e, $f->listid );
                 ok defined $f->alias, sprintf( "(%s) alias = %s", $e, $f->alias );

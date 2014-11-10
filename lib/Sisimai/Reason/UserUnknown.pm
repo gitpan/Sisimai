@@ -14,6 +14,7 @@ sub match {
         qr/email address does not exist/,
         qr/invalid mailbox path/,
         qr/invalid recipient:/,
+        qr/no account by that name here/,
         qr/no such mailbox/,
         qr/no such recipient/,
         qr/no such user here/,
@@ -28,6 +29,7 @@ sub match {
         qr/recipient address rejected: user unknown in[ ].+[ ]table/,
         qr/recipient address rejected: unknown user/,
         qr/recipient is not local/,
+        qr/recipient not found/,
         qr/Requested action not taken: mailbox unavailable/,
         qr/said: 550[-\s]5[.]1[.]1[ ].+[ ]user[ ]unknown[ ]/,
         qr/sorry, user unknown/,
@@ -36,10 +38,13 @@ sub match {
         qr/this user doesn[']?t have a .+ account/, # Yahoo!
         qr/undeliverable address/,
         qr/unknown address/,
+        qr/unknown local[- ]part/,
         qr/unknown recipient/,
         qr/unknown user/,
+        qr/user .+ was not found/,
         qr/user missing home directory/,
         qr/user unknown/,
+        qr/vdeliver: invalid or unknown virtual user/,
     ];
     return 1 if grep { lc( $argvs ) =~ $_ } @$regex;
     return 0;
@@ -55,18 +60,20 @@ sub true {
     my $argvs = shift // return undef;
 
     return undef unless ref $argvs eq 'Sisimai::Data';
-    my $statuscode = $argvs->deliverystatus // '';
-    my $reasontext = __PACKAGE__->text;
-
-    return undef unless length $statuscode;
-    return 1 if $argvs->reason eq $reasontext;
+    return 1 if $argvs->reason eq __PACKAGE__->text;
 
     require Sisimai::RFC3463;
-    my $tempreason = Sisimai::RFC3463->reason( $statuscode );
-    return 0 if $tempreason eq 'suspend';
-
-    my $diagnostic = $argvs->diagnosticcode // '';
+    my $prematches = [ 'RelayingDenied', 'NotAccept', 'MailboxFull' ];
+    my $matchother = 0;
+    my $statuscode = $argvs->deliverystatus // '';
+    my $reasontext = __PACKAGE__->text;
+    my $tempreason = '';
+    my $diagnostic = '';
     my $v = 0;
+
+    $tempreason = Sisimai::RFC3463->reason( $statuscode ) if $statuscode;
+    $diagnostic = $argvs->diagnosticcode // '';
+    return 0 if $tempreason eq 'suspend';
 
     if( $tempreason eq $reasontext ) {
         # *.1.1 = 'Bad destination mailbox address'
@@ -74,30 +81,28 @@ sub true {
         #   Diagnostic-Code: SMTP; 550 5.1.1 <***@example.jp>:
         #     Recipient address rejected: User unknown in local recipient table
         require Module::Load;
-        for my $e ( 'RelayingDenied', 'NotAccept' ) {
+        for my $e ( @$prematches ) {
             # Check the value of "Diagnostic-Code" with other error patterns.
             my $p = 'Sisimai::Reason::'.$e;
             Module::Load::load( $p );
-            last if $p->match( $diagnostic );
-            $v = 1;
-        }
-    } else {
-        if( $argvs->smtpcommand eq 'RCPT' ) {
-            # Check the last SMTP command of the session. When the SMTP command
-            # is not "RCPT", the session rejected by other reason, maybe.
-            my $s = substr( $statuscode, 0, 1 );
-            if( $s == 5 ) {
-                # Permanent error, it's a hard bounce.
-                $v = 1 if __PACKAGE__->match( $diagnostic );
 
-            } elsif( $s == 4 ) {
-                # Temporary error, it's a soft bounce.
-                # Postfix Virtual Mail box
-                # Status: 4.4.7
-                # Diagnostic-Code: SMTP; 450 4.1.1 <***@example.jp>:
-                #   Recipient address rejected: User unknown in virtual mailbox table
-                $v = 1 if __PACKAGE__->match( $diagnostic );
+            if( $p->match( $diagnostic ) ) {
+                # Match with reason defined in Sisimai::Reason::* Except 
+                # UserUnknown.
+                $matchother = 1;
+                last;
             }
+        }
+
+        # Did not match with other message patterns
+        $v = 1 if $matchother == 0;
+
+    } else {
+        # Check the last SMTP command of the session. 
+        if( $argvs->smtpcommand eq 'RCPT' ) {
+            # When the SMTP command is not "RCPT", the session rejected by other
+            # reason, maybe.
+            $v = 1 if __PACKAGE__->match( $diagnostic );
         }
     }
 

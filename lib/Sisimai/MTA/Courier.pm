@@ -23,7 +23,26 @@ my $RxMTA = {
     ],
 };
 
-sub version     { '4.0.1' }
+my $RxErr = {
+    'hostunknown' => [
+        # courier/module.esmtp/esmtpclient.c:526| hard_error(del, ctf, "No such domain.");
+        qr/\ANo such domain[.]\z/,
+    ],
+    'systemerror' => [
+        # courier/module.esmtp/esmtpclient.c:531| hard_error(del, ctf,
+        # courier/module.esmtp/esmtpclient.c:532|  "This domain's DNS violates RFC 1035.");
+        qr/\AThis domain's DNS violates RFC 1035[.]\z/,
+    ],
+};
+
+my $RxTmp = {
+    'systemerror' => [
+        # courier/module.esmtp/esmtpclient.c:535| soft_error(del, ctf, "DNS lookup failed.");
+        qr/\ADNS lookup failed[.]\z/,
+    ],
+};
+
+sub version     { '4.0.7' }
 sub description { 'Courier MTA' }
 sub smtpagent   { 'Courier' }
 
@@ -43,6 +62,7 @@ sub scan {
     my $dscontents = [];    # (Ref->Array) SMTP session errors: message/delivery-status
     my $rfc822head = undef; # (Ref->Array) Required header list in message/rfc822 part
     my $rfc822part = '';    # (String) message/rfc822-headers part
+    my $rfc822next = { 'from' => 0, 'to' => 0, 'subject' => 0 };
     my $previousfn = '';    # (String) Previous field name
 
     my $stripedtxt = [ split( "\n", $$mbody ) ];
@@ -56,7 +76,7 @@ sub scan {
     };
 
     my $v = undef;
-    my $p = undef;
+    my $p = '';
     push @$dscontents, __PACKAGE__->DELIVERYSTATUS;
     $rfc822head = __PACKAGE__->RFC822HEADERS;
 
@@ -77,7 +97,14 @@ sub scan {
 
             } elsif( $e =~ m/\A[\s\t]+/ ) {
                 # Continued line from the previous line
+                next if $rfc822next->{ lc $previousfn };
                 $rfc822part .= $e."\n" if $previousfn =~ m/\A(?:From|To|Subject)\z/;
+
+            } else {
+                # Check the end of headers in rfc822 part
+                next unless $previousfn =~ m/\A(?:From|To|Subject)\z/;
+                next unless $e =~ m/\A\z/;
+                $rfc822next->{ lc $previousfn } = 1;
             }
 
         } else {
@@ -120,6 +147,10 @@ sub scan {
                 } elsif( $e =~ m/Remote-MTA:[ ]*dns;[ ]*(.+)\z/i ) {
                     # Remote-MTA: DNS; mx.example.jp
                     $v->{'rhost'} = lc $1;
+                    if( $v->{'rhost'} =~ m/ / ) {
+                        # Get the first element
+                        $v->{'rhost'} = [ split( ' ', $v->{'rhost'} ) ]->[0];
+                    }
 
                 } elsif( $e =~ m/\ALast-Attempt-Date:[ ]*(.+)\z/i ) {
                     # Last-Attempt-Date: Fri, 14 Feb 2014 12:30:08 -0500
@@ -188,7 +219,7 @@ sub scan {
     } continue {
         # Save the current line for the next loop
         $p = $e;
-        $e = undef;
+        $e = '';
     }
 
     return undef unless $recipients;
@@ -198,9 +229,7 @@ sub scan {
 
     for my $e ( @$dscontents ) {
         # Set default values if each value is empty.
-        for my $f ( 'date', 'lhost', 'rhost' ) {
-            $e->{ $f }  ||= $connheader->{ $f } || '';
-        }
+        map { $e->{ $_ } ||= $connheader->{ $_ } || '' } keys %$connheader;
         $e->{'diagnosis'} = Sisimai::String->sweep( $e->{'diagnosis'} );
 
         if( scalar @{ $mhead->{'received'} } ) {
@@ -209,14 +238,42 @@ sub scan {
             $e->{'lhost'} ||= shift @{ Sisimai::RFC5322->received( $r->[0] ) };
             $e->{'rhost'} ||= pop @{ Sisimai::RFC5322->received( $r->[-1] ) };
         }
-        
+
+        SESSION: while(1) {
+            HARD_E: for my $r ( keys %$RxErr ) {
+                # Verify each regular expression of session errors
+                PATTERN: for my $rr ( @{ $RxErr->{ $r } } ) {
+                    # Check each regular expression
+                    next unless $e->{'diagnosis'} =~ $rr;
+                    $e->{'reason'} = $r;
+                    $e->{'softbounce'} = 0;
+                    last(HARD_E);
+                }
+            }
+            last if $e->{'reason'};
+
+            SOFT_E: for my $r ( keys %$RxTmp ) {
+                # Verify each regular expression of session errors
+                PATTERN: for my $rr ( @{ $RxErr->{ $r } } ) {
+                    # Check each regular expression
+                    next unless $e->{'diagnosis'} =~ $rr;
+                    $e->{'reason'} = $r;
+                    $e->{'softbounce'} = 1;
+                    last(SOFT_E);
+                }
+            }
+
+            last;
+        }
+
         if( ! $e->{'status'} || $e->{'status'} =~ m/\d[.]0[.]0\z/ ) {
             # Get the status code from the respnse of remote MTA.
             my $f = Sisimai::RFC3463->getdsn( $e->{'diagnosis'} );
             $e->{'status'} = $f if length $f;
         }
+        $e->{'spec'}      = '' unless $e->{'spec'} =~ m/\A(?:SMTP|X-UNIX)\z/;
         $e->{'agent'}   ||= __PACKAGE__->smtpagent;
-        $e->{'command'} ||= $commandtxt || 'CONN';
+        $e->{'command'} ||= $commandtxt || '';
     }
     return { 'ds' => $dscontents, 'rfc822' => $rfc822part };
 }

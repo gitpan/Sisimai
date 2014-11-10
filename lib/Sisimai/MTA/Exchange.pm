@@ -50,7 +50,7 @@ my $ErrorCodeTable = {
     ],
 };
 
-sub version     { '4.0.2' }
+sub version     { '4.0.7' }
 sub description { 'Microsoft Exchange Server' }
 sub smtpagent   { 'Exchange' }
 sub headerlist  { return [ 'X-MS-Embedded-Report', 'X-Mailer', 'X-MimeOLE' ] };
@@ -95,6 +95,7 @@ sub scan {
     my $dscontents = [];    # (Ref->Array) SMTP session errors: message/delivery-status
     my $rfc822head = undef; # (Ref->Array) Required header list in message/rfc822 part
     my $rfc822part = '';    # (String) message/rfc822-headers part
+    my $rfc822next = { 'from' => 0, 'to' => 0, 'subject' => 0 };
     my $previousfn = '';    # (String) Previous field name
 
     my $stripedtxt = [ split( "\n", $$mbody ) ];
@@ -108,7 +109,7 @@ sub scan {
     };
 
     my $v = undef;
-    my $p = undef;
+    my $p = '';
     push @$dscontents, __PACKAGE__->DELIVERYSTATUS;
     $rfc822head = __PACKAGE__->RFC822HEADERS;
 
@@ -129,7 +130,14 @@ sub scan {
 
             } elsif( $e =~ m/\A[\s\t]+/ ) {
                 # Continued line from the previous line
+                next if $rfc822next->{ lc $previousfn };
                 $rfc822part .= $e."\n" if $previousfn =~ m/\A(?:From|To|Subject)\z/;
+
+            } else {
+                # Check the end of headers in rfc822 part
+                next unless $previousfn =~ m/\A(?:From|To|Subject)\z/;
+                next unless $e =~ m/\A\z/;
+                $rfc822next->{ lc $previousfn } = 1;
             }
 
         } else {
@@ -152,8 +160,10 @@ sub scan {
                 #     MSEXCH:IMS:KIJITORA CAT:EXAMPLE:EXCHANGE 0 (000C05A6) Unknown Recipient
                 $v = $dscontents->[ -1 ];
 
-                if( $e =~ m/\A([^ ]+[@][^ ]+) on\s*.*\z/ ) {
+                if( $e =~ m/\A\s*([^ ]+[@][^ ]+) on\s*.*\z/ ||
+                    $e =~ m/\A\s*.+SMTP=([^ ]+[@][^ ]+) on\s*.*\z/i ) {
                     # kijitora@example.co.jp on Thu, 29 Apr 2007 16:51:51 -0500
+                    #   kijitora@example.com on 4/29/99 9:19:59 AM
                     if( length $v->{'recipient'} ) {
                         # There are multiple recipient addresses in the message body.
                         push @$dscontents, __PACKAGE__->DELIVERYSTATUS;
@@ -175,6 +185,10 @@ sub scan {
                         $v->{'msexch'} = 1;
                         $v->{'diagnosis'} .= ' '.$e;
                         $statuspart = 1;
+
+                    } else {
+                        # Error message in the body part
+                        $v->{'alterrors'} .= ' '.$e;
                     }
                 }
 
@@ -197,8 +211,10 @@ sub scan {
                     $connheader->{'subject'} = $1;
                     $connvalues++;
 
-                } elsif( $e =~ m/\A\s+Sent:\s+([A-Z][a-z]{2},.+[-+]\d{4})\z/ ) {
+                } elsif( $e =~ m/\A\s+Sent:\s+([A-Z][a-z]{2},.+[-+]\d{4})\z/ ||
+                         $e =~ m|\A\s+Sent:\s+(\d+[/]\d+[/]\d+\s+\d+:\d+:\d+\s.+)|) {
                     #  Sent:    Thu, 29 Apr 2010 18:14:35 +0000
+                    #  Sent:    4/29/99 9:19:59 AM
                     next if length $connheader->{'date'};
                     $connheader->{'date'} = $1;
                     $connvalues++;
@@ -209,7 +225,7 @@ sub scan {
     } continue {
         # Save the current line for the next loop
         $p = $e;
-        $e = undef;
+        $e = '';
     }
 
     return undef unless $recipients;
@@ -218,9 +234,6 @@ sub scan {
     require Sisimai::RFC5322;
 
     for my $e ( @$dscontents ) {
-        # Set default values if each value is empty.
-        $e->{'date'}  ||= $mhead->{'date'};
-        $e->{'agent'} ||= __PACKAGE__->smtpagent;
 
         if( scalar @{ $mhead->{'received'} } ) {
             # Get localhost and remote host name from Received header.
@@ -246,8 +259,20 @@ sub scan {
             $e->{'diagnosis'} = $d;
         }
 
-        $e->{'spec'} = $e->{'reason'} eq 'mailererror' ? 'X-UNIX' : 'SMTP';
-        $e->{'action'} = 'failed' if $e->{'status'} =~ m/\A[45]/;
+        unless( $e->{'reason'} ) {
+            # Could not detect the reason from the value of "diagnosis".
+            if( exists $e->{'alterrors'} && length $e->{'alterrors'} ) {
+                # Copy alternative error message
+                $e->{'diagnosis'} = $e->{'alterrors'}.' '.$e->{'diagnosis'};
+                $e->{'diagnosis'} = Sisimai::String->sweep( $e->{'diagnosis'} );
+                delete $e->{'alterrors'};
+            }
+        }
+
+        $e->{'spec'}    = $e->{'reason'} eq 'mailererror' ? 'X-UNIX' : 'SMTP';
+        $e->{'action'}  = 'failed' if $e->{'status'} =~ m/\A[45]/;
+        $e->{'agent'} ||= __PACKAGE__->smtpagent;
+
         delete $e->{'msexch'};
 
     } # end of for()
@@ -258,7 +283,6 @@ sub scan {
         $rfc822part .= sprintf( "Date: %s\n", $connheader->{'date'} );
         $rfc822part .= sprintf( "Subject: %s\n", $connheader->{'subject'} );
     }
-
     return { 'ds' => $dscontents, 'rfc822' => $rfc822part };
 }
 

@@ -8,6 +8,7 @@ use Time::Piece;
 use Try::Tiny;
 
 use Sisimai::Address;
+use Sisimai::RFC3463;
 use Sisimai::RFC5322;
 use Sisimai::String;
 use Sisimai::Reason;
@@ -22,6 +23,7 @@ my $rwaccessors = [
     'alias',            # (String) The value of alias(RHS)
     'listid',           # (String) List-Id header of each ML
     'reason',           # (String) Bounce reason
+    'action',           # (String) The value of Action header
     'subject',          # (String) UTF-8 Subject text
     'addresser',        # (Sisimai::Address) From: header in the original message
     'recipient',        # (Sisimai::Address) Final-Recipient: or To: in the original message
@@ -70,7 +72,8 @@ sub new {
             }
         }
     }
-    return undef if( ! $thing->{'recipient'} && ! $thing->{'addresser'} );
+    return undef unless ref $thing->{'recipient'} eq 'Sisimai::Address';
+    return undef unless ref $thing->{'addresser'} eq 'Sisimai::Address';
 
     $thing->{'token'} = Sisimai::String->token( 
                             $thing->{'addresser'}->address,
@@ -86,7 +89,7 @@ sub new {
         my $v = [ 
             'listid', 'subject', 'messageid', 'smtpagent', 'diagnosticcode',
             'diagnostictype', 'deliverystatus', 'reason', 'lhost', 'rhost', 
-            'smtpcommand', 'feedbacktype',
+            'smtpcommand', 'feedbacktype', 'action',
         ];
         $thing->{ $_ } = $argvs->{ $_ } // '' for @$v;
     }
@@ -107,21 +110,23 @@ sub make {
     my $rfc822data = $messageobj->rfc822;
     my $fieldorder = { 'recipient' => [], 'addresser' => [] };
     my $objectlist = [];
+    my $endofemail = '';
 
     return undef unless $messageobj->ds;
     return undef unless $messageobj->rfc822;
 
     ORDER_OF_HEADERS: {
         # Decide the order of email headers: user specified or system default.
-        if( exists $argvs->{'order'} && ref $argvs->{'order'} eq 'HASH' ) {
+        my $o = exists $argvs->{'order'} ? $argvs->{'order'} : {};
+        if( ref $o eq 'HASH' && scalar keys %$o ) {
             # If the order of headers for searching is specified, use the order
             # for detecting an email address.
             for my $e ( 'recipient', 'addresser' ) {
                 # The order should be "Array Reference".
-                next unless $argvs->{'order'}->{ $e };
-                next unless ref $argvs->{'order'}->{ $e } eq 'ARRAY';
-                next unless scalar @{ $argvs->{'order'}->{ $e } } eq 'ARRAY';
-                push @{ $fieldorder->{ $e } }, @{ $argvs->{'order'}->{ $e } };
+                next unless $o->{ $e };
+                next unless ref $o->{ $e } eq 'ARRAY';
+                next unless scalar @{ $o->{ $e } };
+                push @{ $fieldorder->{ $e } }, @{ $o->{ $e } };
             }
         }
 
@@ -134,6 +139,7 @@ sub make {
             }
         }
     }
+    $endofemail = Sisimai::MTA->EOM();
 
     LOOP_DELIVERY_STATUS: for my $e ( @{ $messageobj->ds } ) {
         # Create parameters for new() constructor.
@@ -143,9 +149,11 @@ sub make {
             'lhost'          => $e->{'lhost'}        // '',
             'rhost'          => $e->{'rhost'}        // '',
             'alias'          => $e->{'alias'}        // '',
+            'action'         => $e->{'action'}       // '',
             'reason'         => $e->{'reason'}       // '',
             'smtpagent'      => $e->{'agent'}        // '',
             'recipient'      => $e->{'recipient'}    // '',
+            'softbounce'     => $e->{'softbounce'}   // -1,
             'smtpcommand'    => $e->{'command'}      // '',
             'feedbacktype'   => $e->{'feedbacktype'} // '',
             'diagnosticcode' => $e->{'diagnosis'}    // '',
@@ -170,18 +178,18 @@ sub make {
             # email if the address is not set at loop above.
             $p->{'addresser'} ||= $messageobj->{'header'}->{'to'}; 
 
-            if( length $p->{'recipient'} == 0 ) {
-                # Detect "recipient" address if it is not set yet
-                for my $f ( @{ $fieldorder->{'recipient'} } ) {
-                    # Check each header in message/rfc822 part
-                    my $h = lc $f;
-                    next unless exists $rfc822data->{ $h };
-                    next unless length $rfc822data->{ $h };
-                    next unless Sisimai::RFC5322->is_emailaddress( $rfc822data->{ $h } );
-                    $p->{'recipient'} = $rfc822data->{ $h };
-                    last;
-                }
-            }
+            # if( length $p->{'recipient'} == 0 ) {
+            #    # Detect "recipient" address if it is not set yet
+            #    for my $f ( @{ $fieldorder->{'recipient'} } ) {
+            #        # Check each header in message/rfc822 part
+            #        my $h = lc $f;
+            #        next unless exists $rfc822data->{ $h };
+            #        next unless length $rfc822data->{ $h };
+            #        next unless Sisimai::RFC5322->is_emailaddress( $rfc822data->{ $h } );
+            #        $p->{'recipient'} = $rfc822data->{ $h };
+            #        last;
+            #    }
+            # }
 
         } # End of EMAIL_ADDRESS
         next unless $p->{'addresser'};
@@ -189,14 +197,14 @@ sub make {
 
         TIMESTAMP: {
             # Convert from a time stamp or a date string to a machine time.
-            my $v = $e->{'date'};
+            my $v = $e->{'date'} || '';
 
             unless( $v ) {
                 # Date information did not exist in message/delivery-status part,...
                 for my $f ( @{ Sisimai::MTA->RFC822HEADERS('date') } ) {
                     # Get the value of Date header or other date related header.
-                    next unless $rfc822data->{ $f };
-                    $v = $rfc822data->{ $f };
+                    next unless $rfc822data->{ lc $f };
+                    $v = $rfc822data->{ lc $f };
                     last;
                 }
 
@@ -233,29 +241,62 @@ sub make {
         OTHER_TEXT_HEADERS: {
             # Remove square brackets and curly brackets from the host variable
             map { $p->{ $_ } =~ y/[]()//d } ( 'rhost', 'lhost' );
+            for my $e ( 'rhost', 'lhost' ) {
+                # Check space character in each value
+                if( $p->{ $e } =~ m/ / ) {
+                    # Get the first element
+                    $p->{ $e } = [ split( ' ', $p->{ $e } ) ]->[0];
+                }
+            }
             $p->{'subject'} = $rfc822data->{'subject'} // '';
 
             # The value of "List-Id" header
             $p->{'listid'} =  $rfc822data->{'list-id'} // '';
-            $p->{'listid'} =~ y/<>//d if length $p->{'listid'};
+            if( length $p->{'listid'} ) {
+                # Get the value of List-Id header
+                if( $p->{'listid'} =~ m/\A.*([<].+[>]).*\z/ ) {
+                    # List name <list-id@example.org>
+                    $p->{'listid'} =  $1 
+                }
+                $p->{'listid'} =~ y/<>//d;
+                $p->{'listid'} =  '' if $p->{'listid'} =~ m/ /;
+            }
 
             # The value of "Message-Id" header
             $p->{'messageid'} =  $rfc822data->{'message-id'} // '';
             $p->{'messageid'} =~ y/<>//d if length $p->{'messageid'};
+
+            # Cleanup the value of "Diagnostic-Code:" header
+            $p->{'diagnosticcode'} =~ s/\s+$endofemail//;
         }
 
         $o = __PACKAGE__->new( %$p );
         next unless defined $o;
 
-        if( $o->reason eq '' || $o->reason =~ m/\A(?:onhold|undefined)\z/ ) {
+        if( $o->reason eq '' || $o->reason =~ Sisimai::Reason->retry() ) {
             # Decide the reason of email bounce
             if( Sisimai::Rhost->match( $o->rhost ) ) {
                 # Remote host dependent error
                 $r = Sisimai::Rhost->get( $o );
             }
-
             $r ||= Sisimai::Reason->get( $o );
+            $r ||= 'undefined';
             $o->reason( $r );
+        }
+
+        unless( $o->deliverystatus ) {
+            # Set pseudo status code
+            my $s = undef;  # Delivery status
+            my $t = 'p';    # Permanent or Temporary
+
+            if( $p->{'softbounce'} < 0 ) {
+                # Check the bounce is soft bounce or not
+                $p->{'softbounce'} = Sisimai::RFC3463->is_softbounce( $p->{'diagnosticcode'} );
+            }
+
+            $t = 't' if $p->{'softbounce'} == 1;
+            $s = Sisimai::RFC3463->status( $o->reason, $t, 'i' );
+            $o->deliverystatus( $s ) if length $s;
         }
         push @$objectlist, $o;
 

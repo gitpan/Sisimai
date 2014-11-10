@@ -27,7 +27,7 @@ no_index:
 provides:
   Sisimai:
     file: lib/Sisimai.pm
-    version: v4.1.0
+    version: v4.1.1
   Sisimai::ARF:
     file: lib/Sisimai/ARF.pm
   Sisimai::Address:
@@ -46,6 +46,8 @@ provides:
     file: lib/Sisimai/MSP.pm
   Sisimai::MSP::JP::Biglobe:
     file: lib/Sisimai/MSP/JP/Biglobe.pm
+  Sisimai::MSP::JP::EZweb:
+    file: lib/Sisimai/MSP/JP/EZweb.pm
   Sisimai::MSP::JP::KDDI:
     file: lib/Sisimai/MSP/JP/KDDI.pm
   Sisimai::MSP::US::AmazonSES:
@@ -60,6 +62,8 @@ provides:
     file: lib/Sisimai/MSP/US/Verizon.pm
   Sisimai::MTA:
     file: lib/Sisimai/MTA.pm
+  Sisimai::MTA::Activehunter:
+    file: lib/Sisimai/MTA/Activehunter.pm
   Sisimai::MTA::Courier:
     file: lib/Sisimai/MTA/Courier.pm
   Sisimai::MTA::Domino:
@@ -68,12 +72,24 @@ provides:
     file: lib/Sisimai/MTA/Exchange.pm
   Sisimai::MTA::Exim:
     file: lib/Sisimai/MTA/Exim.pm
+  Sisimai::MTA::IMailServer:
+    file: lib/Sisimai/MTA/IMailServer.pm
+  Sisimai::MTA::MXLogic:
+    file: lib/Sisimai/MTA/MXLogic.pm
+  Sisimai::MTA::MailFoundry:
+    file: lib/Sisimai/MTA/MailFoundry.pm
+  Sisimai::MTA::McAfee:
+    file: lib/Sisimai/MTA/McAfee.pm
+  Sisimai::MTA::Notes:
+    file: lib/Sisimai/MTA/Notes.pm
   Sisimai::MTA::OpenSMTPD:
     file: lib/Sisimai/MTA/OpenSMTPD.pm
   Sisimai::MTA::Postfix:
     file: lib/Sisimai/MTA/Postfix.pm
   Sisimai::MTA::Sendmail:
     file: lib/Sisimai/MTA/Sendmail.pm
+  Sisimai::MTA::mFILTER:
+    file: lib/Sisimai/MTA/mFILTER.pm
   Sisimai::MTA::qmail:
     file: lib/Sisimai/MTA/qmail.pm
   Sisimai::Mail:
@@ -143,6 +159,6 @@ requires:
   JSON: 2.90
   Try::Tiny: 0.16
   perl: 5.010
-version: 4.1.0
+version: 4.1.1
 x_contributors:
   - 'azumakuniyuki <azumakuniyuki@gmail.com>'

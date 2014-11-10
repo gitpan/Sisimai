@@ -24,15 +24,23 @@ my $DefaultMTA = [
     'Courier',
     'Exchange',
     'Domino',
+    'Notes',
+    'McAfee',
+    'MXLogic',
+    'MailFoundry',
+    'IMailServer',
+    'mFILTER',
+    'Activehunter',
 ];
 
 my $DefaultMSP = [
     'US::Google',
     'US::Verizon',
     'US::Facebook',
+    'US::AmazonSES',
+    'JP::EZweb',
     'JP::KDDI',
     'JP::Biglobe',
-    'US::AmazonSES',
     'US::SendGrid',
 ];
 
@@ -44,15 +52,19 @@ sub new {
     # @Return       (Sisimai::Message) Structured email data
     my $class = shift;
     my $argvs = { @_ };
-    my $email = $argvs->{'data'} // q();
+    my $email = $argvs->{'data'} // '';
     return undef unless length $email;
 
     my $methodargv = { 'data' => $email };
     my $messageobj = undef;
     my $parameters = undef;
 
-    if( ref $argvs->{'mtalist'} eq 'ARRAY' ) {
-        $methodargv->{'mtalist'} = $argvs->{'mtalist'};
+    for my $e ( 'mtalist', 'msplist' ) {
+        # Order of MTA, MSP
+        next unless exists $argvs->{ $e };
+        next unless ref $argvs->{ $e } eq 'ARRAY';
+        next unless scalar @{ $argvs->{ $e } };
+        $methodargv->{ $e } = $argvs->{ $e };
     }
 
     $parameters = __PACKAGE__->resolve( %$methodargv );
@@ -64,7 +76,6 @@ sub new {
         'ds'     => $parameters->{'ds'},
         'rfc822' => $parameters->{'rfc822'},
     };
-
     return bless( $messageobj, __PACKAGE__ );
 }
 
@@ -81,10 +92,14 @@ sub resolve {
     my $mtamodules = [];
     my $mspmodules = [];
 
-    if( ref $argvs->{'mtalist'} eq 'ARRAY' && scalar @{ $argvs->{'mtalist'} } ) {
+    for my $e ( 'mtalist', 'msplist' ) {
         # The order of MTA modules specified by user
-        push @$mtamodules, @{ $argvs->{'mtalist'} };
-        push @$mspmodules, @{ $argvs->{'msplist'} };
+        next unless exists $argvs->{ $e };
+        next unless ref $argvs->{ $e } eq 'ARRAY';
+        next unless scalar @{ $argvs->{ $e } };
+
+        push @$mtamodules, @{ $argvs->{'mtalist'} } if $e eq 'mtalist';
+        push @$mspmodules, @{ $argvs->{'msplist'} } if $e eq 'msplist';
     }
 
     # Default order of MTA modules
@@ -301,7 +316,7 @@ sub resolve {
 
     } # End of EMAIL_PROCESSING
 
-    return undef unless length $processing->{'rfc822'};
+    return undef unless exists $processing->{'rfc822'};
     return $processing;
 }
 
@@ -329,9 +344,8 @@ sub rewrite {
         # Check whether or not the message is a bounce mail.
         # Pre-Process email body if it is a forwarded bounce message.
         # Get the original text when the subject begins from 'fwd:' or 'fw:'
-        if( lc $mailheader->{'subject'} =~ m{\A\s*fwd?:} ) {
+        if( $mailheader->{'subject'} =~ m/\A\s*fwd?:/i ) {
             # Delete quoted strings, quote symbols(>)
-            $$bodystring =~ s{\A.+?[>]}{>}s;
             $$bodystring =~ s{^[>]+[ ]}{}gm;
             $$bodystring =~ s{^[>]$}{}gm;
         }

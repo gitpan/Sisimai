@@ -66,6 +66,7 @@ sub mimedecode {
     $decodedtext1 = join( '', @$decodedtext0 );
 
     if( $characterset && $encodingname ) {
+        # utf-8 => utf8
         $characterset = 'utf8' if $characterset eq 'utf-8';
 
         if( $characterset ne 'utf8' ) {
@@ -82,6 +83,12 @@ sub mimedecode {
 }
 
 sub boundary {
+    # @Description  Get boundary string
+    # @Param <str>  (String) The value of Content-Type header
+    # @Param <flg>  (Integer) -1 = boundary string
+    #                          0 = start of boundary
+    #                          1 = end of boundary
+    # @Return       (String) Boundary string
     my $class = shift;
     my $argvs = shift || return undef;
     my $start = shift // -1;
@@ -121,7 +128,7 @@ Sisimai::MIME - MIME Utilities
 
 =head1 DESCRIPTION
 
-Sisimai::MIME is MIME Utilities for bouncehammer.
+Sisimai::MIME is MIME Utilities for C<Sisimai>.
 
 =head1 CLASS METHODS
 

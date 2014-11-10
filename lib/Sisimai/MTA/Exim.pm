@@ -30,7 +30,7 @@ use warnings;
 my $RxMTA = {
     'from'      => qr/\AMail Delivery System/,
     'rfc822'    => qr/\A------ This is a copy of the message.+headers[.] ------\z/,
-    'begin'     => qr/\AThis message was created automatically by mail delivery software[.]\z/,
+    'begin'     => qr/\AThis message was created automatically by mail delivery software[.]/,
     'endof'     => qr/\A__END_OF_EMAIL_MESSAGE__\z/,
     'subject'   => [
         qr/Mail delivery failed(:?: returning message to sender)?/,
@@ -100,7 +100,7 @@ my $RxSess = {
     ],
 };
 
-sub version     { '4.0.1' }
+sub version     { '4.0.11' }
 sub description { 'Exim' }
 sub smtpagent   { 'Exim' }
 sub headerlist  { return [ 'X-Failed-Recipients' ] }
@@ -120,22 +120,15 @@ sub scan {
     my $dscontents = [];    # (Ref->Array) SMTP session errors: message/delivery-status
     my $rfc822head = undef; # (Ref->Array) Required header list in message/rfc822 part
     my $rfc822part = '';    # (String) message/rfc822-headers part
+    my $rfc822next = { 'from' => 0, 'to' => 0, 'subject' => 0 };
     my $previousfn = '';    # (String) Previous field name
 
     my $stripedtxt = [ split( "\n", $$mbody ) ];
     my $recipients = 0;     # (Integer) The number of 'Final-Recipient' header
-    my $rcptinhead = [];    # (Ref->Array) Contents of X-Failed-Recipients header
     my $localhost0 = '';    # (String) Local MTA
-    my $softbounce = 0;     # (Integer) 1 = Soft bounce
-    my $connvalues = 0;     # (Integer) Flag, 1 if all the value of $connheader have been set
-    my $connheader = {
-        'date'    => '',    # The value of Arrival-Date header
-        'lhost'   => '',    # The value of Received-From-MTA header
-        'rhost'   => '',    # The value of Reporting-MTA header
-    };
 
     my $v = undef;
-    my $p = undef;
+    my $p = '';
     push @$dscontents, __PACKAGE__->DELIVERYSTATUS;
     $rfc822head = __PACKAGE__->RFC822HEADERS;
 
@@ -156,8 +149,16 @@ sub scan {
 
             } elsif( $e =~ m/\A[\s\t]+/ ) {
                 # Continued line from the previous line
+                next if $rfc822next->{ lc $previousfn };
                 $rfc822part .= $e."\n" if $previousfn =~ m/\A(?:From|To|Subject)\z/;
+
+            } else {
+                # Check the end of headers in rfc822 part
+                next unless $previousfn =~ m/\A(?:From|To|Subject)\z/;
+                next unless $e =~ m/\A\z/;
+                $rfc822next->{ lc $previousfn } = 1;
             }
+
         } else {
             # Before "message/rfc822"
             next unless ( $e =~ $RxMTA->{'begin'} ) .. ( $e =~ $RxMTA->{'rfc822'} );
@@ -173,9 +174,9 @@ sub scan {
             #    host neko.example.jp [192.0.2.222]: 550 5.1.1 <kijitora@example.jp>... User Unknown
             $v = $dscontents->[ -1 ];
 
-            if( $e =~ m/\bThis is a permanent error[.]\b/ ) {
+            if( $e =~ m/\s*This is a permanent error[.]\s*/ ) {
                 # deliver.c:6811|  "recipients. This is a permanent error. The following address(es) failed:\n");
-                $softbounce = 0;
+                $v->{'softbounce'} = 0;
 
             } elsif( $e =~ m/\A\s+([^\s\t]+[@][^\s\t]+[.][a-zA-Z]+)\z/ ) {
                 #   kijitora@example.jp
@@ -188,23 +189,38 @@ sub scan {
                 $recipients++;
 
             } elsif( scalar @$dscontents == $recipients ) {
+                # Error message
                 next unless length $e;
                 $v->{'diagnosis'} .= $e.' ';
+
+            } else {
+                # Error message when email address above does not include '@'
+                # and domain part.
+                next unless $e =~ m/\A\s{4}/;
+                $v->{'alterrors'} .= $e.' ';
             }
         } # End of if: rfc822
 
     } continue {
         # Save the current line for the next loop
         $p = $e;
-        $e = undef;
+        $e = '';
     }
 
     unless( $recipients ) {
         # Fallback for getting recipient addresses
         if( defined $mhead->{'x-failed-recipients'} ) {
             # X-Failed-Recipients: kijitora@example.jp
-            $rcptinhead = [ split( ',', $mhead->{'x-failed-recipients'} ) ];
+            my $rcptinhead = [ split( ',', $mhead->{'x-failed-recipients'} ) ];
+            map { $_ =~ y/ //d } @$rcptinhead;
             $recipients = scalar @$rcptinhead;
+
+            for my $e ( @$rcptinhead ) {
+                # Insert each recipient address into @$dscontents
+                $dscontents->[-1]->{'recipient'} = $e;
+                next if scalar @$dscontents == $recipients;
+                push @$dscontents, __PACKAGE__->DELIVERYSTATUS;
+            }
         }
     }
     return undef unless $recipients;
@@ -221,10 +237,18 @@ sub scan {
 
     for my $e ( @$dscontents ) {
         # Set default values if each value is empty.
-        $e->{'date'}    ||= $mhead->{'date'};
-        $e->{'agent'}   ||= __PACKAGE__->smtpagent;
-        $e->{'lhost'}   ||= $localhost0;
+        $e->{'agent'} ||= __PACKAGE__->smtpagent;
+        $e->{'lhost'} ||= $localhost0;
 
+        if( exists $e->{'alterrors'} && length $e->{'alterrors'} ) {
+            # Copy alternative error message
+            $e->{'diagnosis'} ||= $e->{'alterrors'};
+            if( $e->{'diagnosis'} =~ m/\A[-]+/ || $e->{'diagnosis'} =~ m/__\z/ ) {
+                # Override the value of diagnostic code message
+                $e->{'diagnosis'} = $e->{'alterrors'} if length $e->{'alterrors'};
+            }
+            delete $e->{'alterrors'};
+        }
         $e->{'diagnosis'} =  Sisimai::String->sweep( $e->{'diagnosis'} );
         $e->{'diagnosis'} =~ s{\b__.+\z}{};
 
@@ -245,15 +269,11 @@ sub scan {
         }
 
         if( ! $e->{'command'} ) {
-
-            COMMAND: while(1) {
-                # Get the SMTP command name for the session
-                SMTP: for my $r ( @$RxComm ) {
-                    # Verify each regular expression of SMTP commands
-                    next unless $e->{'diagnosis'} =~ $r;
-                    $e->{'command'} = uc $1;
-                    last(COMMAND);
-                }
+            # Get the SMTP command name for the session
+            SMTP: for my $r ( @$RxComm ) {
+                # Verify each regular expression of SMTP commands
+                next unless $e->{'diagnosis'} =~ $r;
+                $e->{'command'} = uc $1;
                 last;
             }
 
@@ -284,25 +304,9 @@ sub scan {
         }
 
         $e->{'status'} = Sisimai::RFC3463->getdsn( $e->{'diagnosis'} );
-        STATUS_CODE: while(1) {
-            last if length $e->{'status'};
-
-            if( $e->{'reason'} ) {
-                # Set pseudo status code
-                $softbounce = 1 if Sisimai::RFC3463->is_softbounce( $e->{'diagnosis'} );
-                $softbounce = 1 if $e->{'reason'} eq 'expired';
-                my $s = $softbounce ? 't' : 'p';
-                my $r = Sisimai::RFC3463->status( $e->{'reason'}, $s, 'i' );
-                $e->{'status'} = $r if length $r;
-            }
-
-            $e->{'status'} ||= $softbounce ? '4.0.0' : '5.0.0';
-            last;
-        }
-
         $e->{'spec'} = $e->{'reason'} eq 'mailererror' ? 'X-UNIX' : 'SMTP';
         $e->{'action'} = 'failed' if $e->{'status'} =~ m/\A[45]/;
-        $e->{'command'} ||= 'CONN';
+        $e->{'command'} ||= '';
     }
     return { 'ds' => $dscontents, 'rfc822' => $rfc822part };
 }

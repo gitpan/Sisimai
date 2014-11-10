@@ -4,6 +4,7 @@ use strict;
 use warnings;
 use Module::Load;
 
+sub retry { return qr/(?:undefined|onhold|systemerror|securityerror)\z/; }
 sub get {
     # @Description  Detect bounce reason
     # @Param <obj>  (Sisimai::Data) Parsed email object
@@ -12,7 +13,11 @@ sub get {
     my $argvs = shift // return undef;
 
     return undef unless ref $argvs eq 'Sisimai::Data';
-    return $argvs->reason if length $argvs->reason;
+    unless( $argvs->reason =~ __PACKAGE__->retry ) {
+        # Return reason text already decided except reason match with the 
+        # regular expression of ->retry() method.
+        return $argvs->reason if length $argvs->reason;
+    }
 
     my $reasontext = '';
     my $classorder = [
@@ -56,6 +61,8 @@ sub get {
             $reasontext = $p->text if $p->true( $argvs );
             last;
         }
+
+        $reasontext ||= 'expired' if $argvs->action eq 'delayed';
         $reasontext ||= 'undefined';
     }
 
@@ -74,6 +81,7 @@ sub anotherone {
 
     my $statuscode = $argvs->deliverystatus // '';
     my $diagnostic = $argvs->diagnosticcode // '';
+    my $commandtxt = $argvs->smtpcommand    // '';
     my $reasontext = '';
     my $classorder = [
         'MailboxFull', 'SecurityError', 'SystemError', 'Suspend', 'Expired',
@@ -109,11 +117,20 @@ sub anotherone {
                 #  X.7.0   Other or undefined security status
                 $reasontext = 'securityerror';
 
-            } elsif( $argvs->diagnostictype eq 'X-UNIX' ) {
+            } elsif( $argvs->diagnostictype =~ qr/\AX-(?:UNIX|POSTFIX)\z/ ) {
                 # Diagnostic-Code: X-UNIX; ...
                 $reasontext = 'mailererror';
             }
         }
+
+        if( not $reasontext ) {
+            # Check the value of SMTP command
+            if( $commandtxt =~ m/\A(?:EHLO|HELO)\z/ ) {
+                # Rejected at connection or after EHLO|HELO
+                $reasontext = 'blocked';
+            }
+        }
+
     }
     return $reasontext;
 }

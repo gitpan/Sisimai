@@ -15,6 +15,7 @@ use warnings;
 my $RxMTA = {
     'begin'    => qr/\AHi[.] This is the qmail/,
     'rfc822'   => qr/\A--- Below this line is a copy of the message[.]\z/,
+    'error'    => qr/\ARemote host said:/,
     'sorry'    => qr/\A[Ss]orry[,.][ ]/,
     'subject'  => qr/\Afailure notice/,
     'received' => qr/\A[(]qmail[ ]+\d+[ ]+invoked[ ]+for[ ]+bounce[)]/,
@@ -28,8 +29,7 @@ my $RxSMTP = {
         qr/(?:Error:)?Connected to .+ but greeting failed[.]/,
     ],
     'ehlo' => [
-        # qmail-remote.c:238|  if (code >= 500) quit("DConnected to "," but sender was rejected");
-        # qmail-remote.c:239|  if (code >= 400) quit("ZConnected to "," but sender was rejected");
+        # qmail-remote.c:231|  if (smtpcode() != 250) quit("ZConnected to "," but my name was rejected");
         qr/(?:Error:)?Connected to .+ but my name was rejected[.]/,
     ],
     'mail'  => [
@@ -67,11 +67,13 @@ my $RxHost = [
 ];
 
 my $RxSess = {
+    'onhold' => [
+    ],
     'userunknown' => [
         # qmail-local.c:589|  strerr_die1x(100,"Sorry, no mailbox here by that name. (#5.1.1)");
         qr/no mailbox here by that name/,
         # qmail-remote.c:253|  out("s"); outhost(); out(" does not like recipient.\n");
-        qr/does not like recipient/,
+        qr/ does not like recipient[.]/,
     ],
     'mailboxfull' => [
         # error_str.c:192|  X(EDQUOT,"disk quota exceeded")
@@ -84,7 +86,7 @@ my $RxSess = {
     ],
     'expired' => [
         # qmail-send.c:922| ... (&dline[c],"I'm not going to try again; this message has been in the queue too long.\n")) nomem();
-        qr/this message has been in the queue too long/,
+        qr/this message has been in the queue too long[.]\z/,
     ],
     'hostunknown' => [
         # qmail-remote.c:68|  Sorry, I couldn't find any host by that name. (#4.1.2)\n"); zerodie(); }
@@ -130,7 +132,10 @@ my $RxLDAP = {
     ],
 };
 
-sub version     { '4.0.1' }
+# userunknown + expired
+my $RxOnHold = qr/\A[^ ]+ does not like recipient[.]\s+.+this message has been in the queue too long[.]\z/;
+
+sub version     { '4.0.7' }
 sub description { 'qmail' }
 sub smtpagent   { 'qmail' }
 
@@ -153,14 +158,13 @@ sub scan {
     my $dscontents = [];    # (Ref->Array) SMTP session errors: message/delivery-status
     my $rfc822head = undef; # (Ref->Array) Required header list in message/rfc822 part
     my $rfc822part = '';    # (String) message/rfc822-headers part
+    my $rfc822next = { 'from' => 0, 'to' => 0, 'subject' => 0 };
     my $previousfn = '';    # (String) Previous field name
-
-    my $stripedtxt = [ split( "\n", $$mbody ) ];
     my $recipients = 0;     # (Integer) The number of 'Final-Recipient' header
-    my $softbounce = 0;     # (Integer) 1 = Soft bounce
+    my $stripedtxt = [ split( "\n", $$mbody ) ];
 
     my $v = undef;
-    my $p = undef;
+    my $p = '';
     push @$dscontents, __PACKAGE__->DELIVERYSTATUS;
     $rfc822head = __PACKAGE__->RFC822HEADERS;
 
@@ -181,7 +185,14 @@ sub scan {
 
             } elsif( $e =~ m/\A[\s\t]+/ ) {
                 # Continued line from the previous line
+                next if $rfc822next->{ lc $previousfn };
                 $rfc822part .= $e."\n" if $previousfn =~ m/\A(?:From|To|Subject)\z/;
+
+            } else {
+                # Check the end of headers in rfc822 part
+                next unless $previousfn =~ m/\A(?:From|To|Subject)\z/;
+                next unless $e =~ m/\A\z/;
+                $rfc822next->{ lc $previousfn } = 1;
             }
 
         } else {
@@ -197,9 +208,9 @@ sub scan {
 
             if( $e =~ m/\AThis is a permanent error;/ ) {
                 # This is a permanent error; I've given up. Sorry it didn't work out.
-                $softbounce = 0;
+                $v->{'softbounce'} = 0;
 
-            } elsif( $e =~ m{\A(?:To[ ]*:)?[<](.+[@].+)[>]:\z} ) {
+            } elsif( $e =~ m/\A(?:To[ ]*:)?[<](.+[@].+)[>]:\s*\z/ ) {
                 # <kijitora@example.jp>:
                 if( length $v->{'recipient'} ) {
                     # There are multiple recipient addresses in the message body.
@@ -210,9 +221,12 @@ sub scan {
                 $recipients++;
 
             } elsif( scalar @$dscontents == $recipients ) {
+                # Append error message
                 next unless length $e;
                 $v->{'diagnosis'} .= $e.' ';
+                # $v->{'alterrors'}  = $e if $e =~ $RxMTA->{'error'};
 
+                next if $v->{'rhost'};
                 for my $r ( @$RxHost ) {
                     next unless $e =~ $r;
                     $v->{'rhost'} = $1;
@@ -223,7 +237,7 @@ sub scan {
     } continue {
         # Save the current line for the next loop
         $p = $e;
-        $e = undef;
+        $e = '';
     }
 
     return undef unless $recipients;
@@ -233,7 +247,6 @@ sub scan {
 
     for my $e ( @$dscontents ) {
         # Set default values if each value is empty.
-        $e->{'date'}  ||= $mhead->{'date'};
         $e->{'agent'} ||= __PACKAGE__->smtpagent;
 
         if( scalar @{ $mhead->{'received'} } ) {
@@ -279,24 +292,32 @@ sub scan {
                 $e->{'reason'} = 'blocked';
 
             } else {
+                # Try to match with each error message in the table
+                if( $e->{'diagnosis'} =~ $RxOnHold ) {
+                    # To decide the reason require pattern match with 
+                    # Sisimai::Reason::* modules
+                    $e->{'reason'} = 'onhold';
 
-                SESSION: for my $r ( keys %$RxSess ) {
-                    # Verify each regular expression of session errors
-                    PATTERN: for my $rr ( @{ $RxSess->{ $r } } ) {
-                        # Check each regular expression
-                        next unless $e->{'diagnosis'} =~ $rr;
-                        $e->{'reason'} = $r;
-                        last(SESSION);
+                } else {
+
+                    SESSION: for my $r ( keys %$RxSess ) {
+                        # Verify each regular expression of session errors
+                        PATTERN: for my $rr ( @{ $RxSess->{ $r } } ) {
+                            # Check each regular expression
+                            next unless $e->{'diagnosis'} =~ $rr;
+                            $e->{'reason'} = $r;
+                            last(SESSION);
+                        }
                     }
-                }
 
-                LDAP: for my $r ( keys %$RxLDAP ) {
-                    # Verify each regular expression of LDAP errors
-                    PATTERN: for my $rr ( @{ $RxLDAP->{ $r } } ) {
-                        # Check each regular expression
-                        next unless $e->{'diagnosis'} =~ $rr;
-                        $e->{'reason'} = $r;
-                        last(SESSION);
+                    LDAP: for my $r ( keys %$RxLDAP ) {
+                        # Verify each regular expression of LDAP errors
+                        PATTERN: for my $rr ( @{ $RxLDAP->{ $r } } ) {
+                            # Check each regular expression
+                            next unless $e->{'diagnosis'} =~ $rr;
+                            $e->{'reason'} = $r;
+                            last(LDAP);
+                        }
                     }
                 }
             }
@@ -304,24 +325,10 @@ sub scan {
         }
 
         $e->{'status'} = Sisimai::RFC3463->getdsn( $e->{'diagnosis'} );
-        STATUS_CODE: while(1) {
-            last if length $e->{'status'};
-
-            if( $e->{'reason'} ) {
-                # Set pseudo status code
-                $softbounce = 1 if Sisimai::RFC3463->is_softbounce( $e->{'diagnosis'} );
-                my $s = $softbounce ? 't' : 'p';
-                my $r = Sisimai::RFC3463->status( $e->{'reason'}, $s, 'i' );
-                $e->{'status'} = $r if length $r;
-            }
-
-            $e->{'status'} ||= $softbounce ? '4.0.0' : '5.0.0';
-            last;
-        }
-
-        $e->{'spec'} = $e->{'reason'} eq 'mailererror' ? 'X-UNIX' : 'SMTP';
+        $e->{'spec'}   = $e->{'reason'} eq 'mailererror' ? 'X-UNIX' : 'SMTP';
         $e->{'action'} = 'failed' if $e->{'status'} =~ m/\A[45]/;
-        $e->{'command'} ||= 'CONN';
+        $e->{'command'} ||= '';
+
     } # end of for()
 
     return { 'ds' => $dscontents, 'rfc822' => $rfc822part };
@@ -334,7 +341,7 @@ __END__
 
 =head1 NAME
 
-Sisimai::MTA::qmail - bounce mail parser class for v8 qmail.
+Sisimai::MTA::qmail - bounce mail parser class for C<qmail>.
 
 =head1 SYNOPSIS
 
@@ -342,8 +349,8 @@ Sisimai::MTA::qmail - bounce mail parser class for v8 qmail.
 
 =head1 DESCRIPTION
 
-Sisimai::MTA::qmail parses a bounce email which created by v8 qmail.
-Methods in the module are called from only Sisimai::Message.
+Sisimai::MTA::qmail parses a bounce email which created by C<qmail>. Methods in
+the module are called from only Sisimai::Message.
 
 =head1 CLASS METHODS
 

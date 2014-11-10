@@ -5,13 +5,14 @@ use Sisimai::Message;
 
 my $PackageName = 'Sisimai::Message';
 my $MethodNames = {
-    'class' => [ 'new', 'resolve', 'rewrite' ],
+    'class' => [ 'new', 'resolve', 'rewrite', 'ENDOFEMAIL' ],
     'object' => [ 'from', 'header', 'ds', 'rfc822' ],
 };
 my $SampleEmail = './eg/mbox-as-a-sample';
 
 use_ok $PackageName;
 can_ok $PackageName, @{ $MethodNames->{'class'} };
+is $PackageName->ENDOFEMAIL, '__END_OF_EMAIL_MESSAGE__';
 
 MAKE_TEST: {
     use IO::File;
@@ -32,11 +33,17 @@ MAKE_TEST: {
     isa_ok $p->rfc822, 'HASH', '->rfc822';
     ok length $p->from, $p->from;
 
+    $p = $PackageName->new( 
+            'data' => $mailastext, 
+            'mtalist' => [ 'Sendmail', 'Postfix', 'qmail', 'Exchange' ], 
+            'msplist' => [ 'US::Google', 'US::Verizon' ]
+         );
+
     for my $e ( @{ $p->ds } ) {
         is $e->{'spec'}, 'SMTP', '->spec = SMTP';
         ok length $e->{'recipient'}, '->recipient = '.$e->{'recipient'};
         like $e->{'status'}, qr/\d[.]\d[.]\d+/, '->status = '.$e->{'status'};
-        like $e->{'command'}, qr/[A-Z]{4}/, '->command = '.$e->{'command'};
+        ok defined $e->{'command'}, '->command = '.$e->{'command'};
         ok length $e->{'date'}, '->date = '.$e->{'date'};
         ok length $e->{'diagnosis'}, '->diagnosis = '.$e->{'diagnosis'};
         ok length $e->{'action'}, '->action = '.$e->{'action'};

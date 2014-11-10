@@ -3,7 +3,7 @@ use feature ':5.10';
 use strict;
 use warnings;
 
-sub version     { return '4.0.0' }
+sub version     { return '4.0.2' }
 sub description { return '' }
 sub headerlist  { return [] }
 
@@ -18,19 +18,20 @@ sub SMTPCOMMAND {
 sub EOM { '__END_OF_EMAIL_MESSAGE__' };
 sub DELIVERYSTATUS {
     return {
-        'spec'         => '',  # Protocl specification
-        'date'         => '',  # The value of Last-Attempt-Date header
-        'rhost'        => '',  # The value of Remote-MTA header
-        'lhost'        => '',  # The value of Received-From-MTA header
-        'alias'        => '',  # The value of alias entry(RHS)
-        'agent'        => '',  # MTA name
-        'action'       => '',  # The value of Action header
-        'status'       => '',  # The value of Status header
-        'reason'       => '',  # Temporary reason of bounce
-        'command'      => '',  # SMTP command in the message body
-        'diagnosis'    => '',  # The value of Diagnostic-Code header
-        'recipient'    => '',  # The value of Final-Recipient header
-        'feedbacktype' => '',  # FeedBack Type
+        'spec'         => '',   # Protocl specification
+        'date'         => '',   # The value of Last-Attempt-Date header
+        'rhost'        => '',   # The value of Remote-MTA header
+        'lhost'        => '',   # The value of Received-From-MTA header
+        'alias'        => '',   # The value of alias entry(RHS)
+        'agent'        => '',   # MTA name
+        'action'       => '',   # The value of Action header
+        'status'       => '',   # The value of Status header
+        'reason'       => '',   # Temporary reason of bounce
+        'command'      => '',   # SMTP command in the message body
+        'diagnosis'    => '',   # The value of Diagnostic-Code header
+        'recipient'    => '',   # The value of Final-Recipient header
+        'softbounce'   => -1,   # Soft bounce or not
+        'feedbacktype' => '',   # FeedBack Type
     };
 }
 
@@ -108,7 +109,7 @@ sub scan {
 #     };
 # 
 #     my $v = undef;
-#     my $p = undef;
+#     my $p = '';
 #     push @$dscontents, __PACKAGE__->DELIVERYSTATUS;
 #     $rfc822head = __PACKAGE__->RFC822HEADERS;
 # 
@@ -136,7 +137,7 @@ sub scan {
 #     } continue {
 #         # Save the current line for the next loop
 #         $p = $e;
-#         $e = undef;
+#         $e = '';
 #     }
 # 
 #     return undef unless $recipients;
@@ -146,7 +147,7 @@ sub scan {
 #             $e->{ $f }  ||= $connheader->{ $f } || '';
 #         }
 #         $e->{'agent'}   ||= __PACKAGE__->smtpagent;
-#         $e->{'command'} ||= $commandtxt || 'CONN';
+#         $e->{'command'} ||= $commandtxt;
 #     }
 #     return { 'ds' => $dscontents, 'rfc822' => $rfc822part };
 }

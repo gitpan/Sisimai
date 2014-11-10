@@ -26,7 +26,7 @@ my $RxMTA = {
     'subject' => qr/\AUndelivered Mail Returned to Sender\z/,
 };
 
-sub version     { '4.0.1' }
+sub version     { '4.0.8' }
 sub description { 'Postfix' }
 sub smtpagent   { 'Postfix' }
 
@@ -55,6 +55,7 @@ sub scan {
     my $dscontents = [];    # (Ref->Array) SMTP session errors: message/delivery-status
     my $rfc822head = undef; # (Ref->Array) Required header list in message/rfc822 part
     my $rfc822part = '';    # (String) message/rfc822-headers part
+    my $rfc822next = { 'from' => 0, 'to' => 0, 'subject' => 0 };
     my $previousfn = '';    # (String) Previous field name
 
     my $stripedtxt = [ split( "\n", $$mbody ) ];
@@ -64,9 +65,10 @@ sub scan {
         'date'    => '',    # The value of Arrival-Date header
         'lhost'   => '',    # The value of Received-From-MTA header
     };
+    my $anotherset = {};    # Another error information
 
     my $v = undef;
-    my $p = undef;
+    my $p = '';
     push @$dscontents, __PACKAGE__->DELIVERYSTATUS;
     $rfc822head = __PACKAGE__->RFC822HEADERS;
 
@@ -88,7 +90,14 @@ sub scan {
 
             } elsif( $e =~ m/\A[\s\t]+/ ) {
                 # Continued line from the previous line
+                next if $rfc822next->{ lc $previousfn };
                 $rfc822part .= $e."\n" if $previousfn =~ m/\A(?:From|To|Subject)\z/;
+
+            } else {
+                # Check the end of headers in rfc822 part
+                next unless $previousfn =~ m/\A(?:From|To|Subject)\z/;
+                next unless $e =~ m/\A\z/;
+                $rfc822next->{ lc $previousfn } = 1;
             }
 
         } else {
@@ -138,6 +147,13 @@ sub scan {
 
                 } elsif( $e =~ m/\ALast-Attempt-Date:[ ]*(.+)\z/ ) {
                     # Last-Attempt-Date: Fri, 14 Feb 2014 12:30:08 -0500
+                    #
+                    # src/bounce/bounce_notify_util.c:
+                    #   681  #if 0
+                    #   682      if (dsn->time > 0)
+                    #   683          post_mail_fprintf(bounce, "Last-Attempt-Date: %s",
+                    #   684                            mail_date(dsn->time));
+                    #   685  #endif
                     $v->{'date'} = $1;
 
                 } else {
@@ -190,6 +206,28 @@ sub scan {
                     } elsif( $e =~ m/\A(X-Postfix-Sender):[ ]*rfc822;[ ]*(.+)\z/ ) {
                         # X-Postfix-Sender: rfc822; shironeko@example.org
                         $rfc822part .= sprintf( "%s: %s\n", $1, $2 );
+
+                    } else {
+                        # Alternative error message and recipient
+                        if( $e =~ m/\A[<]([^ ]+[@][^ ]+)[>] [(]expanded from [<](.+)[>][)]:\s*(.+)\z/ ) {
+                            # <r@example.ne.jp> (expanded from <kijitora@example.org>): user ...
+                            $anotherset->{'recipient'} = $1;
+                            $anotherset->{'alias'}     = $2;
+                            $anotherset->{'diagnosis'} = $3;
+
+                        } elsif( $e =~ m/\A[<]([^ ]+[@][^ ]+)[>]:(.*)\z/ ) {
+                            # <kijitora@exmaple.jp>: ...
+                            $anotherset->{'recipient'} = $1;
+                            $anotherset->{'diagnosis'} = $2;
+
+                        } else {
+                            # Get error message continued from the previous line
+                            next unless $anotherset->{'diagnosis'};
+                            if( $e =~ m/\A\s{4}(.+)\z/ ) {
+                                #    host mx.example.jp said:...
+                                $anotherset->{'diagnosis'} .= ' '.$e;
+                            }
+                        }
                     }
                 }
             }
@@ -198,7 +236,16 @@ sub scan {
     } continue {
         # Save the current line for the next loop
         $p = $e;
-        $e = undef;
+        $e = '';
+    }
+
+    unless( $recipients ) {
+        # Fallback: set recipient address from error message
+        if( defined $anotherset->{'recipient'} && length $anotherset->{'recipient'} ) {
+            # Set recipient address
+            $dscontents->[-1]->{'recipient'} = $anotherset->{'recipient'};
+            $recipients++;
+        }
     }
 
     return undef unless $recipients;
@@ -208,12 +255,21 @@ sub scan {
 
     for my $e ( @$dscontents ) {
         # Set default values if each value is empty.
-        for my $f ( 'date', 'lhost', 'rhost' ) {
-            $e->{ $f }  ||= $connheader->{ $f } || '';
+        map { $e->{ $_ } ||= $connheader->{ $_ } || '' } keys %$connheader;
+
+        $e->{'agent'} ||= __PACKAGE__->smtpagent;
+        $e->{'command'} = shift @$commandset || '';
+
+        if( exists $anotherset->{'diagnosis'} && length $anotherset->{'diagnosis'} ) {
+            # Copy alternative error message
+            $e->{'diagnosis'} ||= $anotherset->{'diagnosis'};
+            if( $e->{'diagnosis'} =~ m/\A\d+\z/ ) {
+                # Override the value of diagnostic code message
+                $e->{'diagnosis'} = $anotherset->{'diagnosis'};
+            }
         }
-        $e->{'agent'}   ||= __PACKAGE__->smtpagent;
-        $e->{'command'}   = shift @$commandset || 'CONN';
         $e->{'diagnosis'} = Sisimai::String->sweep( $e->{'diagnosis'} );
+        $e->{'spec'} ||= 'SMTP' if $e->{'diagnosis'} =~ m/host .+ said:/;
 
         if( scalar @{ $mhead->{'received'} } ) {
             # Get localhost and remote host name from Received header.
@@ -221,13 +277,13 @@ sub scan {
             $e->{'lhost'} ||= shift @{ Sisimai::RFC5322->received( $r->[0] ) };
             $e->{'rhost'} ||= pop @{ Sisimai::RFC5322->received( $r->[-1] ) };
         }
-        
+
         if( length( $e->{'status'} ) == 0 || $e->{'status'} =~ m/\A\d[.]0[.]0\z/ ) {
             # There is no value of Status header or the value is 5.0.0, 4.0.0
             my $r = Sisimai::RFC3463->getdsn( $e->{'diagnosis'} );
             $e->{'status'} = $r if length $r;
         }
-
+        $e->{'softbounce'} = Sisimai::RFC3463->is_softbounce( $e->{'status'} );
     }
     return { 'ds' => $dscontents, 'rfc822' => $rfc822part };
 }

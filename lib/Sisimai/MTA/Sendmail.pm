@@ -24,7 +24,7 @@ my $RxMTA = {
     ],
 };
 
-sub version     { '4.0.1' }
+sub version     { '4.0.14' }
 sub description { 'V8Sendmail: /usr/sbin/sendmail' }
 sub smtpagent   { 'Sendmail' }
 
@@ -38,25 +38,32 @@ sub scan {
     my $mbody = shift // return undef;
 
     return undef unless grep { $mhead->{'subject'} =~ $_ } @{ $RxMTA->{'subject'} };
-    return undef unless $mhead->{'from'} =~ $RxMTA->{'from'};
+    unless( $mhead->{'subject'} =~ m/\A\s*Fwd?:/i ) {
+        # Fwd: Returned mail: see transcript for details
+        # Do not execute this code if the bounce mail is a forwarded message.
+        return undef unless $mhead->{'from'} =~ $RxMTA->{'from'};
+    }
 
     my $dscontents = [];    # (Ref->Array) SMTP session errors: message/delivery-status
     my $rfc822head = undef; # (Ref->Array) Required header list in message/rfc822 part
     my $rfc822part = '';    # (String) message/rfc822-headers part
+    my $rfc822next = { 'from' => 0, 'to' => 0, 'subject' => 0 };
     my $previousfn = '';    # (String) Previous field name
 
     my $stripedtxt = [ split( "\n", $$mbody ) ];
     my $recipients = 0;     # (Integer) The number of 'Final-Recipient' header
-    my $rcptintext = '';    # (String) Recipient address in the message body
     my $commandtxt = '';    # (String) SMTP Command name begin with the string '>>>'
+    my $esmtpreply = '';    # (String) Reply from remote server on SMTP session
+    my $sessionerr = 0;     # (Integer) Flag, 1 if it is SMTP session error
     my $connvalues = 0;     # (Integer) Flag, 1 if all the value of $connheader have been set
     my $connheader = {
-        'date'    => '',    # The value of Arrival-Date header
-        'rhost'   => '',    # The value of Reporting-MTA header
+        'date'  => '',      # The value of Arrival-Date header
+        'rhost' => '',      # The value of Reporting-MTA header
     };
+    my $anotherset = {};    # Another error information
 
     my $v = undef;
-    my $p = undef;
+    my $p = '';
     push @$dscontents, __PACKAGE__->DELIVERYSTATUS;
     $rfc822head = __PACKAGE__->RFC822HEADERS;
 
@@ -77,12 +84,21 @@ sub scan {
 
             } elsif( $e =~ m/\A[\s\t]+/ ) {
                 # Continued line from the previous line
+                next if $rfc822next->{ lc $previousfn };
                 $rfc822part .= $e."\n" if $previousfn =~ m/\A(?:From|To|Subject)\z/;
+
+            } else {
+                # Check the end of headers in rfc822 part
+                next unless $previousfn =~ m/\A(?:From|To|Subject)\z/;
+                next unless $e =~ m/\A\z/;
+                $rfc822next->{ lc $previousfn } = 1;
             }
 
         } else {
             # Before "message/rfc822"
-            next unless ( $e =~ $RxMTA->{'begin'} ) .. ( grep { $e =~ $_ } @{ $RxMTA->{'rfc822'} } );
+            next unless 
+                ( $e =~ $RxMTA->{'begin'} ) ..
+                ( grep { $e =~ $_ } @{ $RxMTA->{'rfc822'} } );
             next unless length $e;
 
             if( $connvalues == scalar( keys %$connheader ) ) {
@@ -155,6 +171,10 @@ sub scan {
                     # >>> DATA
                     $commandtxt = $1;
 
+                } elsif( $e =~ m/\A[<]{3}[ ]+(.+)\z/ ) {
+                    # <<< Response
+                    $esmtpreply = $1;
+
                 } elsif( $e =~ m/\AReporting-MTA:[ ]*dns;[ ]*(.+)\z/i ) {
                     # Reporting-MTA: dns; mx.example.jp
                     next if length $connheader->{'rhost'};
@@ -163,7 +183,9 @@ sub scan {
 
                 } elsif( $e =~ m/\AReceived-From-MTA:[ ]*dns;[ ]*(.+)\z/i ) {
                     # Received-From-MTA: DNS; x1x2x3x4.dhcp.example.ne.jp
-                    next if length $connheader->{'lhost'};
+                    next if( exists $connheader->{'lhost'} && length $connheader->{'lhost'} );
+
+                    # The value of "lhost" is optional
                     $connheader->{'lhost'} = $1;
                     $connvalues++;
 
@@ -172,6 +194,40 @@ sub scan {
                     next if length $connheader->{'date'};
                     $connheader->{'date'} = $1;
                     $connvalues++;
+
+                } else {
+                    # Detect SMTP session error or connection error
+                    next if $sessionerr;
+                    if( $e =~ $RxMTA->{'error'} ) { 
+                        # ----- Transcript of session follows -----
+                        # ... while talking to mta.example.org.:
+                        $sessionerr = 1;
+                        next;
+                    }
+
+                    if( $e =~ m/\A[<](.+)[>][.]+ (.+)\z/ ) {
+                        # <kijitora@example.co.jp>... Deferred: Name server: example.co.jp.: host name lookup failure
+                        $anotherset->{'recipient'} = $1;
+                        $anotherset->{'diagnosis'} = $2;
+
+                    } else {
+                        # ----- Transcript of session follows -----
+                        # Message could not be delivered for too long
+                        # Message will be deleted from queue
+                        next if $e =~ m/\A\s*[-]+/;
+                        if( $e =~ m/\A\d\d\d\s(\d[.]\d[.]\d)\s.+/ ) {
+                            # 550 5.1.2 <kijitora@example.org>... Message
+                            #
+                            # DBI connect('dbname=...')
+                            # 554 5.3.0 unknown mailer error 255
+                            $anotherset->{'status'} = $1;
+                            $anotherset->{'diagnosis'} .= ' '.$e;
+
+                        } elsif( $e =~ m/\AMessage / ) {
+                            # Message could not be delivered for too long
+                            $anotherset->{'diagnosis'} .= ' '.$e;
+                        }
+                    }
                 }
             }
         } # End of if: rfc822
@@ -179,7 +235,7 @@ sub scan {
     } continue {
         # Save the current line for the next loop
         $p = $e;
-        $e = undef;
+        $e = '';
     }
 
     return undef unless $recipients;
@@ -188,9 +244,7 @@ sub scan {
 
     for my $e ( @$dscontents ) {
         # Set default values if each value is empty.
-        for my $f ( 'date', 'lhost', 'rhost' ) {
-            $e->{ $f } ||= $connheader->{ $f } || '';
-        }
+        map { $e->{ $_ } ||= $connheader->{ $_ } || '' } keys %$connheader;
 
         if( scalar @{ $mhead->{'received'} } ) {
             # Get localhost and remote host name from Received header.
@@ -201,8 +255,34 @@ sub scan {
 
         $e->{'spec'}    ||= 'SMTP';
         $e->{'agent'}   ||= __PACKAGE__->smtpagent;
-        $e->{'command'} ||= $commandtxt || 'CONN';
+        $e->{'command'} ||= $commandtxt || '';
+        $e->{'command'} ||= 'EHLO' if length $esmtpreply;
+
+        if( exists $anotherset->{'diagnosis'} && length $anotherset->{'diagnosis'} ) {
+            # Copy alternative error message
+            $e->{'diagnosis'} ||= $anotherset->{'diagnosis'};
+            if( $e->{'diagnosis'} =~ m/\A\d+\z/ ) {
+                # Override the value of diagnostic code message
+                $e->{'diagnosis'} = $anotherset->{'diagnosis'};
+            }
+        }
         $e->{'diagnosis'} = Sisimai::String->sweep( $e->{'diagnosis'} );
+
+        if( exists $anotherset->{'status'} && length $anotherset->{'status'} ) {
+            # Check alternative status code
+            if( ! $e->{'status'} || $e->{'status'} !~ m/\A[45][.]\d[.]\d\z/ ) {
+                # Override alternative status code
+                $e->{'status'} = $anotherset->{'status'};
+            }
+        }
+
+        unless( $e->{'recipient'} =~ m/\A[^ ]+[@][^ ]+\z/ ) {
+            # @example.jp, no local part
+            if( $e->{'diagnosis'} =~ m/[<]([^ ]+[@][^ ]+)[>]/ ) {
+                # Get email address from the value of Diagnostic-Code header
+                $e->{'recipient'} = $1;
+            }
+        }
     }
     return { 'ds' => $dscontents, 'rfc822' => $rfc822part };
 }

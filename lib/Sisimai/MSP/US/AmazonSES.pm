@@ -6,20 +6,20 @@ use warnings;
 
 # http://aws.amazon.com/ses/
 my $RxMSP = {
-	'from'    => qr/\AMAILER-DAEMON[@]email[-]bounces[.]amazonses[.]com\z/,
-	'begin'   => qr/\AThe following message to [<]/,
-	'rfc822'  => qr|\Acontent-type: message/rfc822\z|,
+    'from'    => qr/\AMAILER-DAEMON[@]email[-]bounces[.]amazonses[.]com\z/,
+    'begin'   => qr/\AThe following message to [<]/,
+    'rfc822'  => qr|\Acontent-type: message/rfc822\z|,
     'endof'   => qr/\A__END_OF_EMAIL_MESSAGE__\z/,
-	'subject' => qr/\ADelivery Status Notification [(]Failure[)]\z/,
+    'subject' => qr/\ADelivery Status Notification [(]Failure[)]\z/,
 };
 
 my $RxErr = {
-	'expired' => [
-		qr/Delivery expired/,
-	],
+    'expired' => [
+        qr/Delivery expired/,
+    ],
 };
 
-sub version     { '4.0.0' }
+sub version     { '4.0.3' }
 sub description { 'AmazonSES: http://aws.amazon.com/ses/' };
 sub smtpagent   { 'US::AmazonSES' }
 sub headerlist  { return [ 'X-AWS-Outgoing' ] }
@@ -40,18 +40,18 @@ sub scan {
     my $dscontents = [];    # (Ref->Array) SMTP session errors: message/delivery-status
     my $rfc822head = undef; # (Ref->Array) Required header list in message/rfc822 part
     my $rfc822part = '';    # (String) message/rfc822-headers part
+    my $rfc822next = { 'from' => 0, 'to' => 0, 'subject' => 0 };
     my $previousfn = '';    # (String) Previous field name
 
     my $stripedtxt = [ split( "\n", $$mbody ) ];
     my $recipients = 0;     # (Integer) The number of 'Final-Recipient' header
-    my $softbounce = 0;     # (Integer) 1 = Soft bounce
     my $connvalues = 0;     # (Integer) Flag, 1 if all the value of $connheader have been set
     my $connheader = {
         'rhost'   => '',    # The value of Reporting-MTA header
     };
 
     my $v = undef;
-    my $p = undef;
+    my $p = '';
     push @$dscontents, __PACKAGE__->DELIVERYSTATUS;
     $rfc822head = __PACKAGE__->RFC822HEADERS;
 
@@ -76,7 +76,14 @@ sub scan {
 
             } elsif( $e =~ m/\A[\s\t]+/ ) {
                 # Continued line from the previous line
+                next if $rfc822next->{ lc $previousfn };
                 $rfc822part .= $e."\n" if $previousfn =~ m/\A(?:From|To|Subject)\z/;
+
+            } else {
+                # Check the end of headers in rfc822 part
+                next unless $previousfn =~ m/\A(?:From|To|Subject)\z/;
+                next unless $e =~ m/\A\z/;
+                $rfc822next->{ lc $previousfn } = 1;
             }
 
         } else {
@@ -120,7 +127,7 @@ sub scan {
                     # Status:5.2.0
                     # Status: 5.1.0 (permanent failure)
                     $v->{'status'} = $1;
-                    $softbounce = 0 if $e =~ m/[(]permanent failure[)]/;
+                    $v->{'softbounce'} = 0 if $e =~ m/[(]permanent failure[)]/;
 
                 } elsif( $e =~ m/\ARemote-MTA:[ ]*dns;[ ]*(.+)\z/i ) {
                     # Remote-MTA: DNS; mx.example.jp
@@ -167,7 +174,7 @@ sub scan {
     } continue {
         # Save the current line for the next loop
         $p = $e;
-        $e = undef;
+        $e = '';
     }
 
     return undef unless $recipients;
@@ -177,7 +184,6 @@ sub scan {
 
     for my $e ( @$dscontents ) {
         # Set default values if each value is empty.
-        $e->{'date'} ||= $mhead->{'date'};
 
         if( scalar @{ $mhead->{'received'} } ) {
             # Get localhost and remote host name from Received header.
@@ -213,9 +219,9 @@ sub scan {
             }
         }
 
-        $e->{'reason'}  ||= Sisimai::RFC3463->reason( $e->{'status'} );
-        $e->{'spec'}    ||= 'SMTP';
-        $e->{'agent'}   ||= __PACKAGE__->smtpagent;
+        $e->{'reason'} ||= Sisimai::RFC3463->reason( $e->{'status'} );
+        $e->{'spec'}   ||= 'SMTP';
+        $e->{'agent'}  ||= __PACKAGE__->smtpagent;
     }
     return { 'ds' => $dscontents, 'rfc822' => $rfc822part };
 }

@@ -5,15 +5,20 @@ use warnings;
 
 # http://tools.ietf.org/html/rfc3464
 my $RxRFC = {
-    'begin'  => qr|\AContent-Type: message/delivery-status\z|i,
+    'begin'  => [
+        qr|\AContent-Type:\s*message/delivery-status\z|i,
+        qr/\AThe original message was received at /i,
+        qr/\AThis report relates to your message/i,
+    ],
     'endof'  => qr/\A__END_OF_EMAIL_MESSAGE__\z/,
     'rfc822' => [
-        qr|\AContent-Type: message/rfc822\z|i,
-        qr|\AContent-Type: text/rfc822-headers\z|i,
+        qr|\AContent-Type:\s*message/rfc822\z|i,
+        qr|\AContent-Type:\s*text/rfc822-headers\z|i,
+        qr|\AReturn-Path:\s*<.+>\z|i,
     ],
 };
 
-sub version     { '4.0.1' };
+sub version     { '4.0.6' };
 sub description { 'Fallback Module for MTAs' };
 sub smtpagent   { 'RFC3464' };
 
@@ -32,12 +37,13 @@ sub scan {
     require Sisimai::MTA;
     require Sisimai::MDA;
     require Sisimai::Address;
+    require Sisimai::RFC5322;
 
+    my $dscontents = [];    # (Ref->Array) SMTP session errors: message/delivery-status
     my $rfc822head = undef; # (Ref->Array) Required header list in message/rfc822 part
     my $rfc822part = '';    # (String) message/rfc822-headers part
+    my $rfc822next = { 'from' => 0, 'to' => 0, 'subject' => 0 };
     my $previousfn = '';    # (String) Previous field name
-    my $dscontents = [];    # (Ref->Array) SMTP session errors: message/delivery-status
-    my $softbounce = 0;     # (Integer) 1 = Soft bounce
 
     my $scannedset = Sisimai::MDA->scan( $mhead, $mbody );
     my $stripedtxt = [ split( "\n", $$mbody ) ];
@@ -70,16 +76,25 @@ sub scan {
 
             } elsif( $e =~ m/\A[\s\t]+/ ) {
                 # Continued line from the previous line
+                next if $rfc822next->{ lc $previousfn };
                 $rfc822part .= $e."\n" if $previousfn =~ m/\A(?:From|To|Subject)\z/;
+
+            } else {
+                # Check the end of headers in rfc822 part
+                next unless $previousfn =~ m/\A(?:From|To|Subject)\z/;
+                next unless $e =~ m/\A\z/;
+                $rfc822next->{ lc $previousfn } = 1;
             }
 
         } else {
             # Before "message/rfc822"
-            next unless ( $e =~ $RxRFC->{'begin'} ) .. ( grep { $e =~ $_ } @{ $RxRFC->{'rfc822'} } );
+            next unless 
+                ( grep { $e =~ $_ } @{ $RxRFC->{'begin'} } ) 
+                    .. ( grep { $e =~ $_ } @{ $RxRFC->{'rfc822'} } );
             next unless length $e;
-
+  
             $v = $dscontents->[ -1 ];
-            if( $e =~ m/\AFinal-Recipient:[ ]*rfc822;[ ]*([^ ]+)\z/i ) {
+            if( $e =~ m/\A(?:Final|Original)-Recipient:[ ]*rfc822;[ ]*([^ ]+)\z/i ) {
                 # 2.3.2 Final-Recipient field
                 #   The Final-Recipient field indicates the recipient for which this set
                 #   of per-recipient fields applies.  This field MUST be present in each
@@ -88,15 +103,7 @@ sub scan {
                 #
                 #       final-recipient-field =
                 #           "Final-Recipient" ":" address-type ";" generic-address
-                if( length $v->{'recipient'} ) {
-                    # There are multiple recipient addresses in the message body.
-                    push @$dscontents, Sisimai::MTA->DELIVERYSTATUS;
-                    $v = $dscontents->[ -1 ];
-                }
-                $v->{'recipient'} = Sisimai::Address->s3s4( $1 );
-                $recipients++;
-
-            } elsif( $e =~ m/\AOriginal-Recipient:[ ]*rfc822;[ ]*([^ ]+)\z/i ) {
+                #
                 # 2.3.1 Original-Recipient field
                 #   The Original-Recipient field indicates the original recipient address
                 #   as specified by the sender of the message for which the DSN is being
@@ -106,7 +113,23 @@ sub scan {
                 #           "Original-Recipient" ":" address-type ";" generic-address
                 #
                 #       generic-address = *text
-                $v->{'alias'} = $1;
+                if( length $v->{'recipient'} ) {
+                    # There are multiple recipient addresses in the message body.
+                    push @$dscontents, Sisimai::MTA->DELIVERYSTATUS;
+                    $v = $dscontents->[ -1 ];
+                }
+                $v->{'recipient'} = Sisimai::Address->s3s4( $1 );
+                $recipients++;
+
+            } elsif( $e =~ m/\AX-Actual-Recipient:[ ]*rfc822;[ ]*(.+)\z/i ) {
+                # X-Actual-Recipient: 
+                if( $1 =~ m/\s+/ ) {
+                    # X-Actual-Recipient: RFC822; |IFS=' ' && exec procmail -f- || exit 75 ...
+
+                } else {
+                    # X-Actual-Recipient: rfc822; kijitora@neko.example.jp
+                    $v->{'alias'} = $1;
+                }
 
             } elsif( $e =~ m/\AAction:[ ]*(.+)\z/i ) {
                 # 2.3.3 Action field
@@ -136,6 +159,10 @@ sub scan {
                 #       status-field = "Status" ":" status-code
                 #       status-code = DIGIT "." 1*3DIGIT "." 1*3DIGIT
                 $v->{'status'} = $1;
+
+            } elsif( $e =~ m/\AStatus:[ ]*(\d+[ ]+.+)\z/i ) {
+                # Status: 553 Exceeded maximum inbound message size
+                $v->{'alterrors'} = $1;
 
             } elsif( $e =~ m/\ARemote-MTA:[ ]*dns;[ ]*(.+)\z/i ) {
                 # 2.3.5 Remote-MTA field
@@ -229,6 +256,12 @@ sub scan {
                         #
                         #       arrival-date-field = "Arrival-Date" ":" date-time
                         $connheader->{'date'} = $1;
+
+                    } else {
+                        # Get error message
+                        next if $e =~ m/\A[ -]+/;
+                        next unless $e =~ m/\A[45]\d\d\s+/;
+                        $v->{'alterrors'} .= ' '.$e;
                     }
                 }
             }
@@ -237,7 +270,7 @@ sub scan {
     } continue {
         # Save the current line for the next loop
         $p = $e;
-        $e = undef;
+        $e = '';
     }
 
     return undef unless $recipients;
@@ -246,8 +279,16 @@ sub scan {
 
     for my $e ( @$dscontents ) {
         # Set default values if each value is empty.
-        for my $f ( 'date', 'lhost', 'rhost' ) {
-            $e->{ $f } ||= $connheader->{ $f } || '';
+        map { $e->{ $_ } ||= $connheader->{ $_ } || '' } keys %$connheader;
+
+        if( exists $e->{'alterrors'} && length $e->{'alterrors'} ) {
+            # Copy alternative error message
+            $e->{'diagnosis'} ||= $e->{'alterrors'};
+            if( $e->{'diagnosis'} =~ m/\A[-]+/ || $e->{'diagnosis'} =~ m/__\z/ ) {
+                # Override the value of diagnostic code message
+                $e->{'diagnosis'} = $e->{'alterrors'} if length $e->{'alterrors'};
+            }
+            delete $e->{'alterrors'};
         }
         $e->{'diagnosis'} = Sisimai::String->sweep( $e->{'diagnosis'} );
 
@@ -257,25 +298,8 @@ sub scan {
             $e->{'reason'}    = $scannedset->{'reason'} || 'undefined';
             $e->{'diagnosis'} = $scannedset->{'message'} if length $scannedset->{'message'};
             $e->{'command'}   = '';
-
-            $softbounce = 1 if Sisimai::RFC3463->is_softbounce( $e->{'diagnosis'} );
-            my $s = $softbounce ? 't' : 'p';
-            my $r = Sisimai::RFC3463->status( $scannedset->{'reason'}, $s, 'i' );
-
-            unless( $e->{'status'} ) {
-                $e->{'status'} = $r || Sisimai::RFC3463->status( 'undefined', $s, 'i' );
-            }
         }
-
-        unless( $e->{'status'} ) {
-            # There is no "Status:" field in the message body
-            $e->{'status'} = Sisimai::RFC3463->getdsn( $e->{'diagnosis'} );
-            $softbounce = 1 if Sisimai::RFC3463->is_softbounce( $e->{'diagnosis'} );
-            my $s = $softbounce ? 't' : 'p';
-
-            # Failed to get the value of Status
-            $e->{'status'} ||= Sisimai::RFC3463->status( 'undefined', $s, 'i' );
-        }
+        $e->{'status'} ||= Sisimai::RFC3463->getdsn( $e->{'diagnosis'} );
 
         if( scalar @{ $mhead->{'received'} } ) {
             # Get localhost and remote host name from Received header.

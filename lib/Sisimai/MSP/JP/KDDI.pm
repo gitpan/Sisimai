@@ -5,22 +5,34 @@ use strict;
 use warnings;
 
 my $RxMSP = {
-    'from'       => qr/[<]?(?>postmaster[@]ezweb[.]ne[.]jp)[>]?/i,
-    'reply-to'   => qr/[<]?.+[@]\w+[.]auone-net[.]jp[>]?\z/i,
+    'from'       => qr/no-reply[@].+[.]dion[.]ne[.]jp/,
+    'reply-to'   => qr/\Afrom\s+\w+[.]auone[-]net[.]jp\s/,
     'received'   => qr/\Afrom[ ](?:.+[.])?ezweb[.]ne[.]jp[ ]/,
-    'subject'    => qr/\AMail System Error - Returned Mail\z/,
     'message-id' => qr/[@].+[.]ezweb[.]ne[.]jp[>]\z/,
+    'begin'      => [
+        qr/\AYour mail sent on:? [A-Z][a-z]{2}[,]/,
+        qr/\AYour mail attempted to be delivered on:? [A-Z][a-z]{2}[,]/,
+    ],
+    'rfc822'     => qr|\AContent-Type: message/rfc822\z|,
+    'error'      => qr/Could not be delivered to:? /,
+    'endof'      => qr/\A__END_OF_EMAIL_MESSAGE__\z/,
 };
 
-my $RxVia = [
-    qr/\Afrom\s+ezweb[.]ne[.]jp\s/,
-    qr/\Afrom\s+\w+[.]auone[-]net[.]jp\s/,
-];
+my $RxErr = {
+    'mailboxfull' => [
+        qr/As their mailbox is full/,
+    ],
+    'norelaying' => [
+        qr/Due to the following SMTP relay error/,
+    ],
+    'hostunknown' => [
+        qr/As the remote domain doesnt exist/,
+    ],
+};
 
-sub version     { '4.0.2' }
+sub version     { '4.0.7' }
 sub description { 'au by KDDI' }
 sub smtpagent   { 'JP::KDDI' }
-sub headerlist  { return [ 'X-SPASIGN' ] }
 
 sub scan {
     # @Description  Detect an error from KDDI
@@ -32,39 +44,22 @@ sub scan {
     my $mbody = shift // return undef;
     my $match = 0;
 
-    # Pre-process email headers of NON-STANDARD bounce message au by KDDI, as
-    # known as ezweb.ne.jp.
-    #   Subject: Mail System Error - Returned Mail
-    #   From: <Postmaster@ezweb.ne.jp>
-    #   Received: from ezweb.ne.jp (wmflb12na02.ezweb.ne.jp [222.15.69.197])
-    #   Received: from nmomta.auone-net.jp ([aaa.bbb.ccc.ddd]) by ...
-    #
     $match++ if $mhead->{'from'} =~ $RxMSP->{'from'};
     $match++ if $mhead->{'reply-to'} && $mhead->{'reply-to'} =~ $RxMSP->{'reply-to'};
-    $match++ if $mhead->{'subject'} =~ $RxMSP->{'subject'};
-    return undef unless( $match || scalar @{ $mhead->{'received'} } );
-
-    for my $e ( @$RxVia ) {
-        # Check each line of Received header
-        next unless grep { $_ =~ $e } @{ $mhead->{'received'} };
-        $match++;
-    }
+    $match++ if $mhead->{'received'} =~ $RxMSP->{'received'};
     return undef unless $match;
 
     my $dscontents = [];    # (Ref->Array) SMTP session errors: message/delivery-status
     my $rfc822head = undef; # (Ref->Array) Required header list in message/rfc822 part
     my $rfc822part = '';    # (String) message/rfc822-headers part
+    my $rfc822next = { 'from' => 0, 'to' => 0, 'subject' => 0 };
     my $previousfn = '';    # (String) Previous field name
 
     my $stripedtxt = [ split( "\n", $$mbody ) ];
     my $recipients = 0;     # (Integer) The number of 'Final-Recipient' header
-    my $softbounce = 0;     # (Integer) 1 = Soft bounce
-
-    my $RxMTA      = {};    # (Ref->Hash) Delimiter patterns
-    my $RxErr      = {};    # (Ref->Hash) Error message patterns
 
     my $v = undef;
-    my $p = undef;
+    my $p = '';
     push @$dscontents, __PACKAGE__->DELIVERYSTATUS;
     $rfc822head = __PACKAGE__->RFC822HEADERS;
 
@@ -72,192 +67,69 @@ sub scan {
     require Sisimai::RFC5322;
     require Sisimai::Address;
 
-    if( ( grep { $_ =~ $RxMSP->{'received'} } @{ $mhead->{'received'} } )
-        || ( $mhead->{'message-id'} =~ $RxMSP->{'message-id'} ) ) {
-        # *@ezweb.ne.jp
-        $RxMTA = {
-            # The user(s) 
-            'begin'  => [
-                qr/\AThe user[(]s[)]\s/,
-                qr/Your message\s/,
-                qr/Each of the following|The following/,
-                qr/[<][^ ]+[@][^ ]+[>]/,
-            ],
-            'rfc822' => qr/\A[-]{50}/,
-            'endof'  => qr/\A__END_OF_EMAIL_MESSAGE__\z/,
-        };
+    for my $e ( @$stripedtxt ) {
 
-        $RxErr = {
-            #'notaccept' => [
-            #    qr/The following recipients did not receive this message:/,
-            #],
-            'mailboxfull' => [
-                qr/The user[(]s[)] account is temporarily over quota/,
-            ],
-            'suspend' => [
-                # http://www.naruhodo-au.kddi.com/qa3429203.html
-                # The recipient may be unpaid user...?
-                qr/The user[(]s[)] account is disabled[.]/,
-                qr/The user[(]s[)] account is temporarily limited[.]/,
-            ],
-            'expired' => [
-                # Your message was not delivered within 0 days and 1 hours.
-                # Remote host is not responding.
-                qr/Your message was not delivered within /,
-            ],
-            'onhold' => [
-                qr/Each of the following recipients was rejected by a remote mail server/,
-            ],
-        };
+        if( ( $e =~ $RxMSP->{'rfc822'} ) .. ( $e =~ $RxMSP->{'endof'} ) ) {
+            # After "message/rfc822"
+            if( $e =~ m/\A([-0-9A-Za-z]+?)[:][ ]*(.+)\z/ ) {
+                # Get required headers only
+                my $lhs = $1;
+                my $rhs = $2;
 
-        for my $e ( @$stripedtxt ) {
-            if( ( $e =~ $RxMTA->{'rfc822'} ) .. ( $e =~ $RxMTA->{'endof'} ) ) {
-                # After "message/rfc822"
-                if( $e =~ m/\A([-0-9A-Za-z]+?)[:][ ]*(.+)\z/ ) {
-                    # Get required headers only
-                    my $lhs = $1;
-                    my $rhs = $2;
+                $previousfn = '';
+                next unless grep { lc( $lhs ) eq lc( $_ ) } @$rfc822head;
 
-                    $previousfn = '';
-                    next unless grep { lc( $lhs ) eq lc( $_ ) } @$rfc822head;
+                $previousfn  = $lhs;
+                $rfc822part .= $e."\n";
 
-                    $previousfn  = $lhs;
-                    $rfc822part .= $e."\n";
-
-                } elsif( $e =~ m/\A[\s\t]+/ ) {
-                    # Continued line from the previous line
-                    $rfc822part .= $e."\n" if $previousfn =~ m/\A(?:From|To|Subject)\z/;
-                }
+            } elsif( $e =~ m/\A[\s\t]+/ ) {
+                # Continued line from the previous line
+                next if $rfc822next->{ lc $previousfn };
+                $rfc822part .= $e."\n" if $previousfn =~ m/\A(?:From|To|Subject)\z/;
 
             } else {
-                # Before "message/rfc822"
-                next unless ( grep { $e =~ $_ } @{ $RxMTA->{'begin'} } ) .. ( $e =~ $RxMTA->{'rfc822'} );
-                next unless length $e;
+                # Check the end of headers in rfc822 part
+                next unless $previousfn =~ m/\A(?:From|To|Subject)\z/;
+                next unless $e =~ m/\A\z/;
+                $rfc822next->{ lc $previousfn } = 1;
+            }
 
-                $v = $dscontents->[ -1 ];
-                if( $e =~ m/\A[<]([^ ]+[@][^ ]+)[>]\z/ ||
-                    $e =~ m/\A[<]([^ ]+[@][^ ]+)[>]:?(.*)\z/ ||
-                    $e =~ m/\A\s+Recipient: [<]([^ ]+[@][^ ]+)[>]/ ) {
-                    # The user(s) account is disabled.
-                    #
-                    # <***@ezweb.ne.jp>: 550 user unknown (in reply to RCPT TO command)
-                    # 
-                    #  -- OR --
-                    # Each of the following recipients was rejected by a remote
-                    # mail server.
-                    #
-                    #    Recipient: <******@ezweb.ne.jp>
-                    #    >>> RCPT TO:<******@ezweb.ne.jp>
-                    #    <<< 550 <******@ezweb.ne.jp>: User unknown
-                    if( length $v->{'recipient'} ) {
-                        # There are multiple recipient addresses in the message body.
-                        push @$dscontents, __PACKAGE__->DELIVERYSTATUS;
-                        $v = $dscontents->[ -1 ];
-                    }
+        } else {
+            # Before "message/rfc822"
+            next unless ( grep { $e =~ $_ } @{ $RxMSP->{'begin'} } ) .. ( $e =~ $RxMSP->{'rfc822'} );
+            next unless length $e;
 
-                    my $r = Sisimai::Address->s3s4( $1 );
-                    if( Sisimai::RFC5322->is_emailaddress( $r ) ) {
-                        $v->{'recipient'} = $r;
-                        $recipients++;
-                    }
-
-                } else {
-                    next if Sisimai::String->is_8bit( \$e );
-                    if( $e =~ m/\A\s+[>]{3}\s+([A-Z]{4})/ ) {
-                        #    >>> RCPT TO:<******@ezweb.ne.jp>
-                        $v->{'command'} = $1;
-
-                    } else {
-                        $v->{'diagnosis'} .= $e.' ';
-                    }
+            $v = $dscontents->[ -1 ];
+            if( $e =~ m/\A\s+Could not be delivered to: [<]([^ ]+[@][^ ]+)[>]/ ) {
+                # Your mail sent on: Thu, 29 Apr 2010 11:04:47 +0900 
+                #     Could not be delivered to: <******@**.***.**>
+                #     As their mailbox is full.
+                if( length $v->{'recipient'} ) {
+                    # There are multiple recipient addresses in the message body.
+                    push @$dscontents, __PACKAGE__->DELIVERYSTATUS;
+                    $v = $dscontents->[ -1 ];
                 }
-            } # End of if: rfc822
 
-        } continue {
-            # Save the current line for the next loop
-            $p = $e;
-            $e = undef;
-        }
-
-    } else {
-        # Bounced from auone-net.jp(DION)
-        $RxMTA= {
-            'begin'  => [
-                qr/\AYour mail sent on:? [A-Z][a-z]{2}[,]/,
-                qr/\AYour mail attempted to be delivered on:? [A-Z][a-z]{2}[,]/,
-            ],
-            'rfc822' => qr|\AContent-Type: message/rfc822\z|,
-            'error'  => qr/Could not be delivered to:? /,
-            'endof'  => qr/\A__END_OF_EMAIL_MESSAGE__\z/,
-        };
-
-        $RxErr = {
-            'mailboxfull' => [
-                qr/As their mailbox is full/,
-            ],
-            'norelaying' => [
-                qr/Due to the following SMTP relay error/,
-            ],
-            'hostunknown' => [
-                qr/As the remote domain doesnt exist/,
-            ],
-        };
-
-        for my $e ( @$stripedtxt ) {
-            if( ( $e =~ $RxMTA->{'rfc822'} ) .. ( $e =~ $RxMTA->{'endof'} ) ) {
-                # After "message/rfc822"
-                if( $e =~ m/\A([-0-9A-Za-z]+?)[:][ ]*(.+)\z/ ) {
-                    # Get required headers only
-                    my $lhs = $1;
-                    my $rhs = $2;
-
-                    $previousfn = '';
-                    next unless grep { lc( $lhs ) eq lc( $_ ) } @$rfc822head;
-
-                    $previousfn  = $lhs;
-                    $rfc822part .= $e."\n";
-
-                } elsif( $e =~ m/\A[\s\t]+/ ) {
-                    # Continued line from the previous line
-                    $rfc822part .= $e."\n" if $previousfn =~ m/\A(?:From|To|Subject)\z/;
+                my $r = Sisimai::Address->s3s4( $1 );
+                if( Sisimai::RFC5322->is_emailaddress( $r ) ) {
+                    $v->{'recipient'} = $r;
+                    $recipients++;
                 }
+
+            } elsif( $e =~ m/Your mail sent on: (.+)\z/ ) {
+                # Your mail sent on: Thu, 29 Apr 2010 11:04:47 +0900 
+                $v->{'date'} = $1;
 
             } else {
-                # Before "message/rfc822"
-                next unless ( grep { $e =~ $_ } @{ $RxMTA->{'begin'} } ) .. ( $e =~ $RxMTA->{'rfc822'} );
-                next unless length $e;
+                #     As their mailbox is full.
+                $v->{'diagnosis'} .= $e.' ' if $e =~ m/\A\s+/;
+            }
+        } # End of if: rfc822
 
-                $v = $dscontents->[ -1 ];
-                if( $e =~ m/\A\s+Could not be delivered to: [<]([^ ]+[@][^ ]+)[>]/ ) {
-                    # Your mail sent on: Thu, 29 Apr 2010 11:04:47 +0900 
-                    #     Could not be delivered to: <******@**.***.**>
-                    #     As their mailbox is full.
-                    if( length $v->{'recipient'} ) {
-                        # There are multiple recipient addresses in the message body.
-                        push @$dscontents, __PACKAGE__->DELIVERYSTATUS;
-                        $v = $dscontents->[ -1 ];
-                    }
-
-                    my $r = Sisimai::Address->s3s4( $1 );
-                    if( Sisimai::RFC5322->is_emailaddress( $r ) ) {
-                        $v->{'recipient'} = $r;
-                        $recipients++;
-                    }
-
-                } elsif( $e =~ m/Your mail sent on: (.+)\z/ ) {
-                    # Your mail sent on: Thu, 29 Apr 2010 11:04:47 +0900 
-                    $v->{'date'} = $1;
-
-                } else {
-                    $v->{'diagnosis'} .= $e.' ';
-                }
-            } # End of if: rfc822
-
-        } continue {
-            # Save the current line for the next loop
-            $p = $e;
-            $e = undef;
-        }
+    } continue {
+        # Save the current line for the next loop
+        $p = $e;
+        $e = '';
     }
 
     return undef unless $recipients;
@@ -265,7 +137,6 @@ sub scan {
 
     for my $e ( @$dscontents ) {
         # Set default values if each value is empty.
-        $e->{'date'}  ||= $mhead->{'date'};
         $e->{'agent'} ||= __PACKAGE__->smtpagent;
 
         if( scalar @{ $mhead->{'received'} } ) {
@@ -283,11 +154,12 @@ sub scan {
 
         } else {
             if( $e->{'command'} eq 'RCPT' ) {
-
+                # set "userunknown" when the remote server rejected after RCPT
+                # command.
                 $e->{'reason'} = 'userunknown';
 
             } else {
-
+                # SMTP command is not RCPT
                 SESSION: for my $r ( keys %$RxErr ) {
                     # Verify each regular expression of session errors
                     PATTERN: for my $rr ( @{ $RxErr->{ $r } } ) {
@@ -300,31 +172,9 @@ sub scan {
             }
         }
 
-        unless( $e->{'reason'} ) {
-            unless( $e->{'recipient'} =~ m/[@]ezweb[.]ne[.]jp\z/ ) {
-                $e->{'reason'} = 'userunknown';
-            }
-        }
-
         $e->{'status'} = Sisimai::RFC3463->getdsn( $e->{'diagnosis'} );
-        STATUS_CODE: while(1) {
-            last if length $e->{'status'};
-
-            if( $e->{'reason'} ) {
-                # Set pseudo status code
-                $softbounce = 1 if Sisimai::RFC3463->is_softbounce( $e->{'diagnosis'} );
-                my $s = $softbounce ? 't' : 'p';
-                my $r = Sisimai::RFC3463->status( $e->{'reason'}, $s, 'i' );
-                $e->{'status'} = $r if length $r;
-            }
-
-            $e->{'status'} ||= $softbounce ? '4.0.0' : '5.0.0';
-            last;
-        }
-
-        $e->{'spec'} = $e->{'reason'} eq 'mailererror' ? 'X-UNIX' : 'SMTP';
+        $e->{'spec'}   = $e->{'reason'} eq 'mailererror' ? 'X-UNIX' : 'SMTP';
         $e->{'action'} = 'failed' if $e->{'status'} =~ m/\A[45]/;
-        $e->{'command'} ||= 'CONN';
 
     } # end of for()
 

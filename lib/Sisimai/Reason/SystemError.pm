@@ -13,8 +13,10 @@ sub match {
         qr/mail forwarding loop for /,
         qr/mail for .+ loops back to myself/,
         qr/mail system configuration error/,
-        qr/Server configuration error/,
+        qr/server configuration error/,
 
+        qr/interrupted system call/,
+        qr/local configuration error/,
         qr/local error in processing/,
         qr/mail system configuration error/,
         qr/maximum forwarding loop count exceeded/,

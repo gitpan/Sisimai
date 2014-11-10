@@ -56,7 +56,7 @@
    "provides" : {
       "Sisimai" : {
          "file" : "lib/Sisimai.pm",
-         "version" : "v4.1.0"
+         "version" : "v4.1.1"
       },
       "Sisimai::ARF" : {
          "file" : "lib/Sisimai/ARF.pm"
@@ -85,6 +85,9 @@
       "Sisimai::MSP::JP::Biglobe" : {
          "file" : "lib/Sisimai/MSP/JP/Biglobe.pm"
       },
+      "Sisimai::MSP::JP::EZweb" : {
+         "file" : "lib/Sisimai/MSP/JP/EZweb.pm"
+      },
       "Sisimai::MSP::JP::KDDI" : {
          "file" : "lib/Sisimai/MSP/JP/KDDI.pm"
       },
@@ -106,6 +109,9 @@
       "Sisimai::MTA" : {
          "file" : "lib/Sisimai/MTA.pm"
       },
+      "Sisimai::MTA::Activehunter" : {
+         "file" : "lib/Sisimai/MTA/Activehunter.pm"
+      },
       "Sisimai::MTA::Courier" : {
          "file" : "lib/Sisimai/MTA/Courier.pm"
       },
@@ -118,6 +124,21 @@
       "Sisimai::MTA::Exim" : {
          "file" : "lib/Sisimai/MTA/Exim.pm"
       },
+      "Sisimai::MTA::IMailServer" : {
+         "file" : "lib/Sisimai/MTA/IMailServer.pm"
+      },
+      "Sisimai::MTA::MXLogic" : {
+         "file" : "lib/Sisimai/MTA/MXLogic.pm"
+      },
+      "Sisimai::MTA::MailFoundry" : {
+         "file" : "lib/Sisimai/MTA/MailFoundry.pm"
+      },
+      "Sisimai::MTA::McAfee" : {
+         "file" : "lib/Sisimai/MTA/McAfee.pm"
+      },
+      "Sisimai::MTA::Notes" : {
+         "file" : "lib/Sisimai/MTA/Notes.pm"
+      },
       "Sisimai::MTA::OpenSMTPD" : {
          "file" : "lib/Sisimai/MTA/OpenSMTPD.pm"
       },
@@ -126,6 +147,9 @@
       },
       "Sisimai::MTA::Sendmail" : {
          "file" : "lib/Sisimai/MTA/Sendmail.pm"
+      },
+      "Sisimai::MTA::mFILTER" : {
+         "file" : "lib/Sisimai/MTA/mFILTER.pm"
       },
       "Sisimai::MTA::qmail" : {
          "file" : "lib/Sisimai/MTA/qmail.pm"
@@ -225,7 +249,7 @@
       }
    },
    "release_status" : "stable",
-   "version" : "4.1.0",
+   "version" : "4.1.1",
    "x_contributors" : [
       "azumakuniyuki <azumakuniyuki@gmail.com>"
    ]
