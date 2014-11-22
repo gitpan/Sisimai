@@ -43,6 +43,7 @@
          "requires" : {
             "Class::Accessor::Lite" : "0.05",
             "JSON" : "2.90",
+            "Time::Local" : "1.19",
             "Try::Tiny" : "0.16",
             "perl" : "5.010"
          }
@@ -56,7 +57,7 @@
    "provides" : {
       "Sisimai" : {
          "file" : "lib/Sisimai.pm",
-         "version" : "v4.1.1"
+         "version" : "v4.1.2"
       },
       "Sisimai::ARF" : {
          "file" : "lib/Sisimai/ARF.pm"
@@ -127,6 +128,9 @@
       "Sisimai::MTA::IMailServer" : {
          "file" : "lib/Sisimai/MTA/IMailServer.pm"
       },
+      "Sisimai::MTA::InterScanMSS" : {
+         "file" : "lib/Sisimai/MTA/InterScanMSS.pm"
+      },
       "Sisimai::MTA::MXLogic" : {
          "file" : "lib/Sisimai/MTA/MXLogic.pm"
       },
@@ -147,6 +151,15 @@
       },
       "Sisimai::MTA::Sendmail" : {
          "file" : "lib/Sisimai/MTA/Sendmail.pm"
+      },
+      "Sisimai::MTA::SurfControl" : {
+         "file" : "lib/Sisimai/MTA/SurfControl.pm"
+      },
+      "Sisimai::MTA::V5sendmail" : {
+         "file" : "lib/Sisimai/MTA/V5sendmail.pm"
+      },
+      "Sisimai::MTA::X1" : {
+         "file" : "lib/Sisimai/MTA/X1.pm"
       },
       "Sisimai::MTA::mFILTER" : {
          "file" : "lib/Sisimai/MTA/mFILTER.pm"
@@ -249,7 +262,7 @@
       }
    },
    "release_status" : "stable",
-   "version" : "4.1.1",
+   "version" : "4.1.2",
    "x_contributors" : [
       "azumakuniyuki <azumakuniyuki@gmail.com>"
    ]

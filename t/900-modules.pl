@@ -28,6 +28,7 @@ sub list {
             MTA/Exim.pm
             MTA/Exchange.pm
             MTA/IMailServer.pm
+            MTA/InterScanMSS.pm
             MTA/MailFoundry.pm
             MTA/McAfee.pm
             MTA/mFILTER.pm
@@ -37,6 +38,8 @@ sub list {
             MTA/Postfix.pm
             MTA/qmail.pm
             MTA/Sendmail.pm
+            MTA/SurfControl.pm
+            MTA/V5sendmail.pm
         Reason.pm
             Reason/Blocked.pm
             Reason/ContentError.pm

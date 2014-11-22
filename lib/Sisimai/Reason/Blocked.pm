@@ -11,7 +11,11 @@ sub match {
         # Blocked due to clent IP address or hostname
         qr/access from ip address .+ blocked/,
         qr/client host rejected: may not be mail exchanger/,
-        qr/hosts with dynamic ip/
+        qr/connection refused by/,
+        qr/connection reset by peer/,
+        qr/hosts with dynamic ip/,
+        qr/no access from mail server/,
+        qr/unresolvable relay host name/,
     ];
     return 1 if grep { lc( $argvs ) =~ $_ } @$regex;
     return 0;
@@ -27,17 +31,19 @@ sub true {
     my $argvs = shift // return undef;
 
     return undef unless ref $argvs eq 'Sisimai::Data';
-    my $statuscode = $argvs->deliverystatus // '';
-    my $reasontext = __PACKAGE__->text;
-
-    return undef unless length $statuscode;
-    return 1 if $argvs->reason eq $reasontext;
+    return 1 if $argvs->reason eq __PACKAGE__->text;
 
     require Sisimai::RFC3463;
-    my $diagnostic = $argvs->diagnosticcode // '';
+    my $statuscode = $argvs->deliverystatus // '';
+    my $reasontext = __PACKAGE__->text;
+    my $tempreason = '';
+    my $diagnostic = '';
     my $v = 0;
 
-    if( Sisimai::RFC3463->reason( $statuscode ) eq $reasontext ) {
+    $tempreason = Sisimai::RFC3463->reason( $statuscode ) if $statuscode;
+    $diagnostic = $argvs->diagnosticcode // '';
+
+    if( $tempreason eq $reasontext ) {
         # Delivery status code points "blocked".
         $v = 1;
 

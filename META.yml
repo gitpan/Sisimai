@@ -9,7 +9,7 @@ configure_requires:
   CPAN::Meta::Prereqs: 0
   Module::Build: 0.38
 dynamic_config: 0
-generated_by: 'Minilla/v0.5.3, CPAN::Meta::Converter version 2.131560'
+generated_by: 'Minilla/v0.5.3, CPAN::Meta::Converter version 2.112150'
 license: bsd
 meta-spec:
   url: http://module-build.sourceforge.net/META-spec-v1.4.html
@@ -27,138 +27,214 @@ no_index:
 provides:
   Sisimai:
     file: lib/Sisimai.pm
-    version: v4.1.1
+    version: v4.1.2
   Sisimai::ARF:
     file: lib/Sisimai/ARF.pm
+    version: 0
   Sisimai::Address:
     file: lib/Sisimai/Address.pm
+    version: 0
   Sisimai::Data:
     file: lib/Sisimai/Data.pm
+    version: 0
   Sisimai::Data::JSON:
     file: lib/Sisimai/Data/JSON.pm
+    version: 0
   Sisimai::ISO3166:
     file: lib/Sisimai/ISO3166.pm
+    version: 0
   Sisimai::MDA:
     file: lib/Sisimai/MDA.pm
+    version: 0
   Sisimai::MIME:
     file: lib/Sisimai/MIME.pm
+    version: 0
   Sisimai::MSP:
     file: lib/Sisimai/MSP.pm
+    version: 0
   Sisimai::MSP::JP::Biglobe:
     file: lib/Sisimai/MSP/JP/Biglobe.pm
+    version: 0
   Sisimai::MSP::JP::EZweb:
     file: lib/Sisimai/MSP/JP/EZweb.pm
+    version: 0
   Sisimai::MSP::JP::KDDI:
     file: lib/Sisimai/MSP/JP/KDDI.pm
+    version: 0
   Sisimai::MSP::US::AmazonSES:
     file: lib/Sisimai/MSP/US/AmazonSES.pm
+    version: 0
   Sisimai::MSP::US::Facebook:
     file: lib/Sisimai/MSP/US/Facebook.pm
+    version: 0
   Sisimai::MSP::US::Google:
     file: lib/Sisimai/MSP/US/Google.pm
+    version: 0
   Sisimai::MSP::US::SendGrid:
     file: lib/Sisimai/MSP/US/SendGrid.pm
+    version: 0
   Sisimai::MSP::US::Verizon:
     file: lib/Sisimai/MSP/US/Verizon.pm
+    version: 0
   Sisimai::MTA:
     file: lib/Sisimai/MTA.pm
+    version: 0
   Sisimai::MTA::Activehunter:
     file: lib/Sisimai/MTA/Activehunter.pm
+    version: 0
   Sisimai::MTA::Courier:
     file: lib/Sisimai/MTA/Courier.pm
+    version: 0
   Sisimai::MTA::Domino:
     file: lib/Sisimai/MTA/Domino.pm
+    version: 0
   Sisimai::MTA::Exchange:
     file: lib/Sisimai/MTA/Exchange.pm
+    version: 0
   Sisimai::MTA::Exim:
     file: lib/Sisimai/MTA/Exim.pm
+    version: 0
   Sisimai::MTA::IMailServer:
     file: lib/Sisimai/MTA/IMailServer.pm
+    version: 0
+  Sisimai::MTA::InterScanMSS:
+    file: lib/Sisimai/MTA/InterScanMSS.pm
+    version: 0
   Sisimai::MTA::MXLogic:
     file: lib/Sisimai/MTA/MXLogic.pm
+    version: 0
   Sisimai::MTA::MailFoundry:
     file: lib/Sisimai/MTA/MailFoundry.pm
+    version: 0
   Sisimai::MTA::McAfee:
     file: lib/Sisimai/MTA/McAfee.pm
+    version: 0
   Sisimai::MTA::Notes:
     file: lib/Sisimai/MTA/Notes.pm
+    version: 0
   Sisimai::MTA::OpenSMTPD:
     file: lib/Sisimai/MTA/OpenSMTPD.pm
+    version: 0
   Sisimai::MTA::Postfix:
     file: lib/Sisimai/MTA/Postfix.pm
+    version: 0
   Sisimai::MTA::Sendmail:
     file: lib/Sisimai/MTA/Sendmail.pm
+    version: 0
+  Sisimai::MTA::SurfControl:
+    file: lib/Sisimai/MTA/SurfControl.pm
+    version: 0
+  Sisimai::MTA::V5sendmail:
+    file: lib/Sisimai/MTA/V5sendmail.pm
+    version: 0
+  Sisimai::MTA::X1:
+    file: lib/Sisimai/MTA/X1.pm
+    version: 0
   Sisimai::MTA::mFILTER:
     file: lib/Sisimai/MTA/mFILTER.pm
+    version: 0
   Sisimai::MTA::qmail:
     file: lib/Sisimai/MTA/qmail.pm
+    version: 0
   Sisimai::Mail:
     file: lib/Sisimai/Mail.pm
+    version: 0
   Sisimai::Mail::Maildir:
     file: lib/Sisimai/Mail/Maildir.pm
+    version: 0
   Sisimai::Mail::Mbox:
     file: lib/Sisimai/Mail/Mbox.pm
+    version: 0
   Sisimai::Message:
     file: lib/Sisimai/Message.pm
+    version: 0
   Sisimai::RFC2606:
     file: lib/Sisimai/RFC2606.pm
+    version: 0
   Sisimai::RFC3463:
     file: lib/Sisimai/RFC3463.pm
+    version: 0
   Sisimai::RFC3464:
     file: lib/Sisimai/RFC3464.pm
+    version: 0
   Sisimai::RFC5322:
     file: lib/Sisimai/RFC5322.pm
+    version: 0
   Sisimai::Reason:
     file: lib/Sisimai/Reason.pm
+    version: 0
   Sisimai::Reason::Blocked:
     file: lib/Sisimai/Reason/Blocked.pm
+    version: 0
   Sisimai::Reason::ContentError:
     file: lib/Sisimai/Reason/ContentError.pm
+    version: 0
   Sisimai::Reason::ExceedLimit:
     file: lib/Sisimai/Reason/ExceedLimit.pm
+    version: 0
   Sisimai::Reason::Expired:
     file: lib/Sisimai/Reason/Expired.pm
+    version: 0
   Sisimai::Reason::Filtered:
     file: lib/Sisimai/Reason/Filtered.pm
+    version: 0
   Sisimai::Reason::HostUnknown:
     file: lib/Sisimai/Reason/HostUnknown.pm
+    version: 0
   Sisimai::Reason::MailboxFull:
     file: lib/Sisimai/Reason/MailboxFull.pm
+    version: 0
   Sisimai::Reason::MailerError:
     file: lib/Sisimai/Reason/MailerError.pm
+    version: 0
   Sisimai::Reason::MesgTooBig:
     file: lib/Sisimai/Reason/MesgTooBig.pm
+    version: 0
   Sisimai::Reason::NotAccept:
     file: lib/Sisimai/Reason/NotAccept.pm
+    version: 0
   Sisimai::Reason::OnHold:
     file: lib/Sisimai/Reason/OnHold.pm
+    version: 0
   Sisimai::Reason::Rejected:
     file: lib/Sisimai/Reason/Rejected.pm
+    version: 0
   Sisimai::Reason::RelayingDenied:
     file: lib/Sisimai/Reason/RelayingDenied.pm
+    version: 0
   Sisimai::Reason::SecurityError:
     file: lib/Sisimai/Reason/SecurityError.pm
+    version: 0
   Sisimai::Reason::Suspend:
     file: lib/Sisimai/Reason/Suspend.pm
+    version: 0
   Sisimai::Reason::SystemError:
     file: lib/Sisimai/Reason/SystemError.pm
+    version: 0
   Sisimai::Reason::SystemFull:
     file: lib/Sisimai/Reason/SystemFull.pm
+    version: 0
   Sisimai::Reason::UserUnknown:
     file: lib/Sisimai/Reason/UserUnknown.pm
+    version: 0
   Sisimai::Rhost:
     file: lib/Sisimai/Rhost.pm
+    version: 0
   Sisimai::Rhost::GoogleApps:
     file: lib/Sisimai/Rhost/GoogleApps.pm
+    version: 0
   Sisimai::String:
     file: lib/Sisimai/String.pm
+    version: 0
   Sisimai::Time:
     file: lib/Sisimai/Time.pm
+    version: 0
 requires:
   Class::Accessor::Lite: 0.05
   JSON: 2.90
+  Time::Local: 1.19
   Try::Tiny: 0.16
   perl: 5.010
-version: 4.1.1
+version: 4.1.2
 x_contributors:
   - 'azumakuniyuki <azumakuniyuki@gmail.com>'
