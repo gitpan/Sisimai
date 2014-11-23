@@ -57,7 +57,7 @@
    "provides" : {
       "Sisimai" : {
          "file" : "lib/Sisimai.pm",
-         "version" : "v4.1.2"
+         "version" : "v4.1.3"
       },
       "Sisimai::ARF" : {
          "file" : "lib/Sisimai/ARF.pm"
@@ -95,17 +95,26 @@
       "Sisimai::MSP::US::AmazonSES" : {
          "file" : "lib/Sisimai/MSP/US/AmazonSES.pm"
       },
+      "Sisimai::MSP::US::Aol" : {
+         "file" : "lib/Sisimai/MSP/US/Aol.pm"
+      },
       "Sisimai::MSP::US::Facebook" : {
          "file" : "lib/Sisimai/MSP/US/Facebook.pm"
       },
       "Sisimai::MSP::US::Google" : {
          "file" : "lib/Sisimai/MSP/US/Google.pm"
       },
+      "Sisimai::MSP::US::Outlook" : {
+         "file" : "lib/Sisimai/MSP/US/Outlook.pm"
+      },
       "Sisimai::MSP::US::SendGrid" : {
          "file" : "lib/Sisimai/MSP/US/SendGrid.pm"
       },
       "Sisimai::MSP::US::Verizon" : {
          "file" : "lib/Sisimai/MSP/US/Verizon.pm"
+      },
+      "Sisimai::MSP::US::Yahoo" : {
+         "file" : "lib/Sisimai/MSP/US/Yahoo.pm"
       },
       "Sisimai::MTA" : {
          "file" : "lib/Sisimai/MTA.pm"
@@ -139,6 +148,9 @@
       },
       "Sisimai::MTA::McAfee" : {
          "file" : "lib/Sisimai/MTA/McAfee.pm"
+      },
+      "Sisimai::MTA::MessagingServer" : {
+         "file" : "lib/Sisimai/MTA/MessagingServer.pm"
       },
       "Sisimai::MTA::Notes" : {
          "file" : "lib/Sisimai/MTA/Notes.pm"
@@ -262,7 +274,7 @@
       }
    },
    "release_status" : "stable",
-   "version" : "4.1.2",
+   "version" : "4.1.3",
    "x_contributors" : [
       "azumakuniyuki <azumakuniyuki@gmail.com>"
    ]

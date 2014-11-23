@@ -27,7 +27,7 @@ no_index:
 provides:
   Sisimai:
     file: lib/Sisimai.pm
-    version: v4.1.2
+    version: v4.1.3
   Sisimai::ARF:
     file: lib/Sisimai/ARF.pm
     version: 0
@@ -64,17 +64,26 @@ provides:
   Sisimai::MSP::US::AmazonSES:
     file: lib/Sisimai/MSP/US/AmazonSES.pm
     version: 0
+  Sisimai::MSP::US::Aol:
+    file: lib/Sisimai/MSP/US/Aol.pm
+    version: 0
   Sisimai::MSP::US::Facebook:
     file: lib/Sisimai/MSP/US/Facebook.pm
     version: 0
   Sisimai::MSP::US::Google:
     file: lib/Sisimai/MSP/US/Google.pm
     version: 0
+  Sisimai::MSP::US::Outlook:
+    file: lib/Sisimai/MSP/US/Outlook.pm
+    version: 0
   Sisimai::MSP::US::SendGrid:
     file: lib/Sisimai/MSP/US/SendGrid.pm
     version: 0
   Sisimai::MSP::US::Verizon:
     file: lib/Sisimai/MSP/US/Verizon.pm
+    version: 0
+  Sisimai::MSP::US::Yahoo:
+    file: lib/Sisimai/MSP/US/Yahoo.pm
     version: 0
   Sisimai::MTA:
     file: lib/Sisimai/MTA.pm
@@ -108,6 +117,9 @@ provides:
     version: 0
   Sisimai::MTA::McAfee:
     file: lib/Sisimai/MTA/McAfee.pm
+    version: 0
+  Sisimai::MTA::MessagingServer:
+    file: lib/Sisimai/MTA/MessagingServer.pm
     version: 0
   Sisimai::MTA::Notes:
     file: lib/Sisimai/MTA/Notes.pm
@@ -235,6 +247,6 @@ requires:
   Time::Local: 1.19
   Try::Tiny: 0.16
   perl: 5.010
-version: 4.1.2
+version: 4.1.3
 x_contributors:
   - 'azumakuniyuki <azumakuniyuki@gmail.com>'

@@ -3,7 +3,7 @@ use feature ':5.10';
 use strict;
 use warnings;
 
-sub version     { return '4.0.2' }
+sub version     { return '4.0.3' }
 sub description { return '' }
 sub headerlist  { return [] }
 
@@ -75,6 +75,22 @@ sub RFC822HEADERS {
 sub smtpagent {
     my $class = shift; 
     return shift // 'null';
+}
+
+sub index {
+    # @Description  MTA list
+    # @Param        None
+    # @Return       (Ref->Array) MTA list with order
+    my $class = shift;
+    my $index = [
+        'Sendmail', 'Postfix', 'qmail', 'OpenSMTPD', 'Exim', 'Courier',
+        'Exchange', 'MessagingServer', 'V5sendmail', 'McAfee', 'Domino', 'Notes',
+        'MXLogic', 'MailFoundry', 'IMailServer', 'mFILTER', 'Activehunter',
+        'InterScanMSS', 'SurfControl',
+        'X1',
+    ];
+
+    return $index;
 }
 
 sub scan {

@@ -17,10 +17,13 @@ sub list {
             MSP/JP/EZweb.pm
             MSP/JP/KDDI.pm
             MSP/US/AmazonSES.pm
+            MSP/US/Aol.pm
             MSP/US/Facebook.pm
             MSP/US/Google.pm
+            MSP/US/Outlook.pm
             MSP/US/SendGrid.pm
             MSP/US/Verizon.pm
+            MSP/US/Yahoo.pm
         MTA.pm
             MTA/Activehunter.pm
             MTA/Courier.pm
@@ -31,6 +34,7 @@ sub list {
             MTA/InterScanMSS.pm
             MTA/MailFoundry.pm
             MTA/McAfee.pm
+            MTA/MessagingServer.pm
             MTA/mFILTER.pm
             MTA/MXLogic.pm
             MTA/Notes.pm
@@ -40,6 +44,7 @@ sub list {
             MTA/Sendmail.pm
             MTA/SurfControl.pm
             MTA/V5sendmail.pm
+            MTA/X1.pm
         Reason.pm
             Reason/Blocked.pm
             Reason/ContentError.pm

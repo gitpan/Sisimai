@@ -4,7 +4,7 @@ use strict;
 use warnings;
 use Sisimai::MTA;
 
-sub version     { return '4.0.2' }
+sub version     { return '4.0.5' }
 sub description { return '' }
 sub headerlist  { return [] }
 
@@ -20,6 +20,21 @@ sub RFC822HEADERS  {
 sub smtpagent {
     my $class = shift; 
     return shift // 'null';
+}
+
+sub index {
+    # @Description  MSP list
+    # @Param        None
+    # @Return       (Ref->Array) MSP list with order
+    my $class = shift;
+    my $index = [
+        'US::Google', 'US::Yahoo', 'US::Aol', 'US::Outlook',
+        'US::AmazonSES', 'US::SendGrid',
+        'JP::EZweb', 'JP::KDDI', 'JP::Biglobe',
+        'US::Verizon', 'US::Facebook', 
+    ];
+
+    return $index;
 }
 
 sub scan {
