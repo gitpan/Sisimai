@@ -1,21 +1,18 @@
-package Sisimai::MTA::MXLogic;
+package Sisimai::MSP::RU::MailRu;
 use parent 'Sisimai::MTA';
 use feature ':5.10';
 use strict;
 use warnings;
 
 # Based on Sisimai::MTA::Exim
-my $RxMTA = {
-    'from'    => qr/\AMail Delivery System/,
-    'rfc822'  => qr/\AIncluded is a copy of the message header:\z/,
-    'begin'   => qr/\AThis message was created automatically by mail delivery software[.]\z/,
-    'endof'   => qr/\A__END_OF_EMAIL_MESSAGE__\z/,
-    'subject' => [
-        qr/Mail delivery failed(:?: returning message to sender)?/,
-        qr/Warning: message .+ delayed\s+/,
-        qr/Delivery Status Notification/,
-    ],
-    'message-id' => qr/\A[<]mxl[~][0-9a-f]+/,
+my $RxMSP = {
+    'from'      => qr/\Amailer-daemon[@].*mail[.]ru/,
+    'rfc822'    => qr/\A------ This is a copy of the message.+headers[.] ------\z/,
+    'begin'     => qr/\AThis message was created automatically by mail delivery software[.]/,
+    'endof'     => qr/\A__END_OF_EMAIL_MESSAGE__\z/,
+    'subject'   => qr/Mail failure[.]\z/,
+    'message-id'=> qr/\A[<]\w+[-]\w+[-]\w+[@].*mail[.]ru[>]\z/,
+    # Message-Id: <E1P1YNN-0003AD-Ga@*.mail.ru>
 };
 
 my $RxComm = [
@@ -53,13 +50,13 @@ my $RxSess = {
     ],
 };
 
-sub version     { '4.0.3' }
-sub description { 'McAfee SaaS' }
-sub smtpagent   { 'MXLogic' }
-sub headerlist  { return [ 'X-MXL-NoteHash' ] }
+sub version     { '4.0.0' }
+sub description { '@mail.ru' }
+sub smtpagent   { 'RU::MailRu' }
+sub headerlist  { return [ 'X-Failed-Recipients' ] }
 
 sub scan {
-    # @Description  Detect an error from MXLogic
+    # @Description  Detect an error from @mail.ru
     # @Param <ref>  (Ref->Hash) Message header
     # @Param <ref>  (Ref->String) Message body
     # @Return       (Ref->Hash) Bounce data list and message/rfc822 part
@@ -67,9 +64,9 @@ sub scan {
     my $mhead = shift // return undef;
     my $mbody = shift // return undef;
 
-	return undef unless defined $mhead->{'x-mxl-notehash'};
-    return undef unless grep { $mhead->{'subject'} =~ $_ } @{ $RxMTA->{'subject'} };
-    return undef unless $mhead->{'from'} =~ $RxMTA->{'from'};
+    return undef unless $mhead->{'subject'}    =~ $RxMSP->{'subject'};
+    return undef unless $mhead->{'from'}       =~ $RxMSP->{'from'};
+    return undef unless $mhead->{'message-id'} =~ $RxMSP->{'message-id'};
 
     my $dscontents = [];    # (Ref->Array) SMTP session errors: message/delivery-status
     my $rfc822head = undef; # (Ref->Array) Required header list in message/rfc822 part
@@ -87,8 +84,8 @@ sub scan {
     $rfc822head = __PACKAGE__->RFC822HEADERS;
 
     for my $e ( @$stripedtxt ) {
-        # Read each line between $RxMTA->{'begin'} and $RxMTA->{'rfc822'}.
-        if( ( $e =~ $RxMTA->{'rfc822'} ) .. ( $e =~ $RxMTA->{'endof'} ) ) {
+        # Read each line between $RxMSP->{'begin'} and $RxMSP->{'rfc822'}.
+        if( ( $e =~ $RxMSP->{'rfc822'} ) .. ( $e =~ $RxMSP->{'endof'} ) ) {
             # After "message/rfc822"
             if( $e =~ m/\A([-0-9A-Za-z]+?)[:][ ]*(.+)\z/ ) {
                 # Get required headers only
@@ -115,9 +112,19 @@ sub scan {
 
         } else {
             # Before "message/rfc822"
-            next unless ( $e =~ $RxMTA->{'begin'} ) .. ( $e =~ $RxMTA->{'rfc822'} );
+            next unless ( $e =~ $RxMSP->{'begin'} ) .. ( $e =~ $RxMSP->{'rfc822'} );
             next unless length $e;
 
+            # Это письмо создано автоматически
+            # сервером Mail.Ru, # отвечать на него не
+            # нужно.
+            #
+            # К сожалению, Ваше письмо не может
+            # быть# доставлено одному или нескольким
+            # получателям:
+            #
+            # **********************
+            #
             # This message was created automatically by mail delivery software.
             #
             # A message that you sent could not be delivered to one or more of its
@@ -129,27 +136,29 @@ sub scan {
             $v = $dscontents->[ -1 ];
 
             if( $e =~ m/\s*This is a permanent error[.]\s*/ ) {
-                # deliver.c:6811|  "recipients. This is a permanent error. The following address(es) failed:\n");
+                # recipients. This is a permanent error. The following address(es) failed:
                 $v->{'softbounce'} = 0;
 
-            } elsif( $e =~ m/\A\s*[<]([^ ]+[@][^ ]+)[>]:(.+)\z/ ) {
-                # A message that you have sent could not be delivered to one or more
-                # recipients.  This is a permanent error.  The following address failed:
-                #
-                #  <kijitora@example.co.jp>: 550 5.1.1 ...
+            } elsif( $e =~ m/\A\s+([^\s\t]+[@][^\s\t]+[.][a-zA-Z]+)\z/ ) {
+                #   kijitora@example.jp
                 if( length $v->{'recipient'} ) {
                     # There are multiple recipient addresses in the message body.
                     push @$dscontents, __PACKAGE__->DELIVERYSTATUS;
                     $v = $dscontents->[ -1 ];
                 }
                 $v->{'recipient'} = $1;
-                $v->{'diagnosis'} = $2;
                 $recipients++;
 
             } elsif( scalar @$dscontents == $recipients ) {
                 # Error message
                 next unless length $e;
                 $v->{'diagnosis'} .= $e.' ';
+
+            } else {
+                # Error message when email address above does not include '@'
+                # and domain part.
+                next unless $e =~ m/\A\s{4}/;
+                $v->{'alterrors'} .= $e.' ';
             }
         } # End of if: rfc822
 
@@ -157,6 +166,23 @@ sub scan {
         # Save the current line for the next loop
         $p = $e;
         $e = '';
+    }
+
+    unless( $recipients ) {
+        # Fallback for getting recipient addresses
+        if( defined $mhead->{'x-failed-recipients'} ) {
+            # X-Failed-Recipients: kijitora@example.jp
+            my $rcptinhead = [ split( ',', $mhead->{'x-failed-recipients'} ) ];
+            map { $_ =~ y/ //d } @$rcptinhead;
+            $recipients = scalar @$rcptinhead;
+
+            for my $e ( @$rcptinhead ) {
+                # Insert each recipient address into @$dscontents
+                $dscontents->[-1]->{'recipient'} = $e;
+                next if scalar @$dscontents == $recipients;
+                push @$dscontents, __PACKAGE__->DELIVERYSTATUS;
+            }
+        }
     }
     return undef unless $recipients;
 
@@ -175,7 +201,17 @@ sub scan {
         $e->{'agent'} ||= __PACKAGE__->smtpagent;
         $e->{'lhost'} ||= $localhost0;
 
+        if( exists $e->{'alterrors'} && length $e->{'alterrors'} ) {
+            # Copy alternative error message
+            $e->{'diagnosis'} ||= $e->{'alterrors'};
+            if( $e->{'diagnosis'} =~ m/\A[-]+/ || $e->{'diagnosis'} =~ m/__\z/ ) {
+                # Override the value of diagnostic code message
+                $e->{'diagnosis'} = $e->{'alterrors'} if length $e->{'alterrors'};
+            }
+            delete $e->{'alterrors'};
+        }
         $e->{'diagnosis'} =  Sisimai::String->sweep( $e->{'diagnosis'} );
+        $e->{'diagnosis'} =~ s{\b__.+\z}{};
 
         if( ! $e->{'rhost'} ) {
             # Get the remote host name
@@ -194,15 +230,11 @@ sub scan {
         }
 
         if( ! $e->{'command'} ) {
-
-            COMMAND: while(1) {
-                # Get the SMTP command name for the session
-                SMTP: for my $r ( @$RxComm ) {
-                    # Verify each regular expression of SMTP commands
-                    next unless $e->{'diagnosis'} =~ $r;
-                    $e->{'command'} = uc $1;
-                    last(COMMAND);
-                }
+            # Get the SMTP command name for the session
+            SMTP: for my $r ( @$RxComm ) {
+                # Verify each regular expression of SMTP commands
+                next unless $e->{'diagnosis'} =~ $r;
+                $e->{'command'} = uc $1;
                 last;
             }
 
@@ -247,17 +279,16 @@ __END__
 
 =head1 NAME
 
-Sisimai::MTA::MXLogic - bounce mail parser class for C<MX Logic>.
+Sisimai::MSP::RU::MailRu - bounce mail parser class for C<@mail.ru>.
 
 =head1 SYNOPSIS
 
-    use Sisimai::MTA::MXLogic;
+    use Sisimai::MSP::RU::MailRu;
 
 =head1 DESCRIPTION
 
-Sisimai::MTA::MXLogic parses a bounce email which created by C<McAfee SaaS 
-(formerly MX Logic)>. Methods in the module are called from only 
-Sisimai::Message.
+Sisimai::MSP::RU::MailRu parses a bounce email which created by C<@mail.ru>.
+Methods in the module are called from only Sisimai::Message.
 
 =head1 CLASS METHODS
 
@@ -265,19 +296,19 @@ Sisimai::Message.
 
 C<version()> returns the version number of this module.
 
-    print Sisimai::MTA::MXLogic->version;
+    print Sisimai::MSP::RU::MailRu->version;
 
 =head2 C<B<description()>>
 
 C<description()> returns description string of this module.
 
-    print Sisimai::MTA::MXLogic->description;
+    print Sisimai::MSP::RU::MailRu->description;
 
 =head2 C<B<smtpagent()>>
 
 C<smtpagent()> returns MTA name.
 
-    print Sisimai::MTA::MXLogic->smtpagent;
+    print Sisimai::MSP::RU::MailRu->smtpagent;
 
 =head2 C<B<scan( I<header data>, I<reference to body string>)>>
 

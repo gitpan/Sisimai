@@ -52,6 +52,10 @@ eg/maildir-as-a-sample/new/courier-01.eml
 eg/maildir-as-a-sample/new/courier-02.eml
 eg/maildir-as-a-sample/new/courier-03.eml
 eg/maildir-as-a-sample/new/courier-04.eml
+eg/maildir-as-a-sample/new/de-gmx-01.eml
+eg/maildir-as-a-sample/new/de-gmx-02.eml
+eg/maildir-as-a-sample/new/de-gmx-03.eml
+eg/maildir-as-a-sample/new/de-gmx-04.eml
 eg/maildir-as-a-sample/new/domino-01.eml
 eg/maildir-as-a-sample/new/domino-02.eml
 eg/maildir-as-a-sample/new/exchange-01.eml
@@ -103,6 +107,7 @@ eg/maildir-as-a-sample/new/opensmtpd-01.eml
 eg/maildir-as-a-sample/new/opensmtpd-02.eml
 eg/maildir-as-a-sample/new/opensmtpd-03.eml
 eg/maildir-as-a-sample/new/opensmtpd-04.eml
+eg/maildir-as-a-sample/new/opensmtpd-05.eml
 eg/maildir-as-a-sample/new/postfix-01.eml
 eg/maildir-as-a-sample/new/postfix-02.eml
 eg/maildir-as-a-sample/new/postfix-03.eml
@@ -124,6 +129,9 @@ eg/maildir-as-a-sample/new/rfc3464-05.eml
 eg/maildir-as-a-sample/new/rfc3464-06.eml
 eg/maildir-as-a-sample/new/rfc3464-07.eml
 eg/maildir-as-a-sample/new/rfc3464-08.eml
+eg/maildir-as-a-sample/new/ru-mailru-01.eml
+eg/maildir-as-a-sample/new/ru-mailru-02.eml
+eg/maildir-as-a-sample/new/ru-mailru-03.eml
 eg/maildir-as-a-sample/new/sendmail-01.eml
 eg/maildir-as-a-sample/new/sendmail-02.eml
 eg/maildir-as-a-sample/new/sendmail-03.eml
@@ -151,6 +159,7 @@ eg/maildir-as-a-sample/new/us-amazonses-03.eml
 eg/maildir-as-a-sample/new/us-aol-01.eml
 eg/maildir-as-a-sample/new/us-aol-02.eml
 eg/maildir-as-a-sample/new/us-aol-03.eml
+eg/maildir-as-a-sample/new/us-aol-04.eml
 eg/maildir-as-a-sample/new/us-facebook-01.eml
 eg/maildir-as-a-sample/new/us-facebook-02.eml
 eg/maildir-as-a-sample/new/us-google-01.eml
@@ -160,6 +169,10 @@ eg/maildir-as-a-sample/new/us-google-04.eml
 eg/maildir-as-a-sample/new/us-google-05.eml
 eg/maildir-as-a-sample/new/us-google-06.eml
 eg/maildir-as-a-sample/new/us-google-07.eml
+eg/maildir-as-a-sample/new/us-google-08.eml
+eg/maildir-as-a-sample/new/us-google-09.eml
+eg/maildir-as-a-sample/new/us-google-10.eml
+eg/maildir-as-a-sample/new/us-google-11.eml
 eg/maildir-as-a-sample/new/us-outlook-01.eml
 eg/maildir-as-a-sample/new/us-outlook-02.eml
 eg/maildir-as-a-sample/new/us-outlook-03.eml
@@ -191,9 +204,11 @@ lib/Sisimai/ISO3166.pm
 lib/Sisimai/MDA.pm
 lib/Sisimai/MIME.pm
 lib/Sisimai/MSP.pm
+lib/Sisimai/MSP/DE/GMX.pm
 lib/Sisimai/MSP/JP/Biglobe.pm
 lib/Sisimai/MSP/JP/EZweb.pm
 lib/Sisimai/MSP/JP/KDDI.pm
+lib/Sisimai/MSP/RU/MailRu.pm
 lib/Sisimai/MSP/US/AmazonSES.pm
 lib/Sisimai/MSP/US/Aol.pm
 lib/Sisimai/MSP/US/Facebook.pm
@@ -304,6 +319,8 @@ t/118-msp-jp-ezweb.t
 t/119-msp-us-yahoo.t
 t/120-msp-us-aol.t
 t/121-msp-us-outlook.t
+t/122-msp-ru-mailru.t
+t/123-msp-de-gmx.t
 t/200-reason.t
 t/201-reason-userunknown.t
 t/202-reason-relayingdenied.t
@@ -360,6 +377,8 @@ xt/208-msp-jp-ezweb.t
 xt/209-msp-us-yahoo.t
 xt/210-msp-us-aol.t
 xt/211-msp-us-outlook.t
+xt/212-msp-ru-mailru.t
+xt/213-msp-de-gmx.t
 xt/300-arf.t
 xt/310-rfc3464.t
 META.yml

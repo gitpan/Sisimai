@@ -4,8 +4,10 @@
       "azumakuniyuki"
    ],
    "dynamic_config" : 0,
-   "generated_by" : "Minilla/v0.5.3",
-   "license" : "bsd",
+   "generated_by" : "Minilla/v2.2.1",
+   "license" : [
+      "unknown"
+   ],
    "meta-spec" : {
       "url" : "http://search.cpan.org/perldoc?CPAN::Meta::Spec",
       "version" : "2"
@@ -19,21 +21,21 @@
          "share",
          "eg",
          "examples",
-         "author"
+         "author",
+         "builder"
       ]
    },
    "prereqs" : {
       "configure" : {
          "requires" : {
-            "CPAN::Meta" : "0",
-            "CPAN::Meta::Prereqs" : "0",
             "Module::Build" : "0.38"
          }
       },
       "develop" : {
          "requires" : {
             "Test::CPAN::Meta" : "0",
-            "Test::MinimumVersion" : "0.10108",
+            "Test::MinimumVersion::Fast" : "0.04",
+            "Test::PAUSE::Permissions" : "0.04",
             "Test::Pod" : "1.41",
             "Test::Spellunker" : "v0.2.7",
             "Test::UsedModules" : "0.03"
@@ -57,7 +59,7 @@
    "provides" : {
       "Sisimai" : {
          "file" : "lib/Sisimai.pm",
-         "version" : "v4.1.3"
+         "version" : "v4.1.4"
       },
       "Sisimai::ARF" : {
          "file" : "lib/Sisimai/ARF.pm"
@@ -71,6 +73,9 @@
       "Sisimai::Data::JSON" : {
          "file" : "lib/Sisimai/Data/JSON.pm"
       },
+      "Sisimai::Data::YAML" : {
+         "file" : "lib/Sisimai/Data/YAML.pm"
+      },
       "Sisimai::ISO3166" : {
          "file" : "lib/Sisimai/ISO3166.pm"
       },
@@ -83,6 +88,9 @@
       "Sisimai::MSP" : {
          "file" : "lib/Sisimai/MSP.pm"
       },
+      "Sisimai::MSP::DE::GMX" : {
+         "file" : "lib/Sisimai/MSP/DE/GMX.pm"
+      },
       "Sisimai::MSP::JP::Biglobe" : {
          "file" : "lib/Sisimai/MSP/JP/Biglobe.pm"
       },
@@ -91,6 +99,9 @@
       },
       "Sisimai::MSP::JP::KDDI" : {
          "file" : "lib/Sisimai/MSP/JP/KDDI.pm"
+      },
+      "Sisimai::MSP::RU::MailRu" : {
+         "file" : "lib/Sisimai/MSP/RU/MailRu.pm"
       },
       "Sisimai::MSP::US::AmazonSES" : {
          "file" : "lib/Sisimai/MSP/US/AmazonSES.pm"
@@ -274,7 +285,7 @@
       }
    },
    "release_status" : "stable",
-   "version" : "4.1.3",
+   "version" : "4.1.4",
    "x_contributors" : [
       "azumakuniyuki <azumakuniyuki@gmail.com>"
    ]

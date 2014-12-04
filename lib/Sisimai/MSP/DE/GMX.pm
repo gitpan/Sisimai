@@ -1,25 +1,32 @@
-package Sisimai::MTA::SurfControl;
-use parent 'Sisimai::MTA';
+package Sisimai::MSP::DE::GMX;
+use parent 'Sisimai::MSP';
 use feature ':5.10';
 use strict;
 use warnings;
 
-my $RxMTA = {
-    'from'     => qr/ [(]Mail Delivery System[)]\z/,
-    'begin'    => qr/\AYour message could not be sent[.]\z/,
-    'error'    => qr/\AFailed to send to identified host,\z/,
-    'rfc822'   => qr|\AContent-Type: message/rfc822\z|,
-    'endof'    => qr/\A__END_OF_EMAIL_MESSAGE__\z/,
-    'x-mailer' => qr/\ASurfControl E-mail Filter\z/,
+my $RxMSP = {
+    'from'    => qr/\AMAILER-DAEMON[@]/,
+    'begin'   => qr/\AThis message was created automatically by mail delivery software/,
+    'rfc822'  => qr/\A--- The header of the original message is following/,
+    'endof'   => qr/\A__END_OF_EMAIL_MESSAGE__\z/,
+    'subject' => qr/\AMail delivery failed: returning message to sender\z/,
 };
 
-sub version     { '4.0.0' }
-sub description { 'WebSense SurfControl' }
-sub smtpagent   { 'SurfControl' }
-sub headerlist  { return [ 'X-SEF-Processed', 'X-Mailer' ] }
+my $RxSess = {
+    'expired' => [
+        qr/delivery retry timeout exceeded/,
+    ],
+};
+
+sub version     { '4.0.1' }
+sub description { 'GMX' }
+sub smtpagent   { 'DE::GMX' }
+sub headerlist  { 
+    return [ 'Envelope-To', 'X-GMX-Antispam', 'X-GMX-Antivirus' ]
+}
 
 sub scan {
-    # @Description  Detect an error from SurfControl
+    # @Description  Detect an error from GMX
     # @Param <ref>  (Ref->Hash) Message header
     # @Param <ref>  (Ref->String) Message body
     # @Return       (Ref->Hash) Bounce data list and message/rfc822 part
@@ -27,9 +34,9 @@ sub scan {
     my $mhead = shift // return undef;
     my $mbody = shift // return undef;
 
-    return undef unless $mhead->{'x-sef-processed'};
-    return undef unless $mhead->{'x-mailer'};
-    return undef unless $mhead->{'x-mailer'} =~ $RxMTA->{'x-mailer'};
+    return undef unless $mhead->{'envelope-to'};
+    return undef unless $mhead->{'from'}    =~ $RxMSP->{'from'};
+    return undef unless $mhead->{'subject'} =~ $RxMSP->{'subject'};
 
     my $dscontents = [];    # (Ref->Array) SMTP session errors: message/delivery-status
     my $rfc822head = undef; # (Ref->Array) Required header list in message/rfc822 part
@@ -46,8 +53,10 @@ sub scan {
     $rfc822head = __PACKAGE__->RFC822HEADERS;
 
     for my $e ( @$stripedtxt ) {
-        # Read each line between $RxMTA->{'begin'} and $RxMTA->{'rfc822'}.
-        if( ( $e =~ $RxMTA->{'rfc822'} ) .. ( $e =~ $RxMTA->{'endof'} ) ) {
+        # Read each line between $RxMSP->{'begin'} and $RxMSP->{'rfc822'}.
+        $e =~ s{=\d+\z}{};
+
+        if( ( $e =~ $RxMSP->{'rfc822'} ) .. ( $e =~ $RxMSP->{'endof'} ) ) {
             # After "message/rfc822"
             if( $e =~ m/\A([-0-9A-Za-z]+?)[:][ ]*(.+)\z/ ) {
                 # Get required headers only
@@ -74,23 +83,29 @@ sub scan {
 
         } else {
             # Before "message/rfc822"
-            next unless ( $e =~ $RxMTA->{'begin'} ) .. ( $e =~ $RxMTA->{'rfc822'} );
+            next unless ( $e =~ $RxMSP->{'begin'} ) .. ( $e =~ $RxMSP->{'rfc822'} );
             next unless length $e;
 
+            # This message was created automatically by mail delivery software.
+            #
+            # A message that you sent could not be delivered to one or more of
+            # its recipients. This is a permanent error. The following address
+            # failed:
+            #
+            # "shironeko@example.jp":
+            # SMTP error from remote server after RCPT command:
+            # host: mx.example.jp
+            # 5.1.1 <shironeko@example.jp>... User Unknown
             $v = $dscontents->[ -1 ];
 
-            # Your message could not be sent.
-            # A transcript of the attempts to send the message follows.
-            # The number of attempts made: 1
-            # Addressed To: kijitora@example.com
-            #
-            # Thu 29 Apr 2010 23:34:45 +0900
-            # Failed to send to identified host,
-            # kijitora@example.com: [192.0.2.5], 550 kijitora@example.com... No such user
-            # --- Message non-deliverable.
-
-            if( $e =~ m/\AAddressed To:\s*([^ ]+?[@][^ ]+?)\z/ ) {
-                # Addressed To: kijitora@example.com
+            if( $e =~ m/\A["]([^ ]+[@][^ ]+)["]:\z/ ||
+                $e =~ m/\A[<]([^ ]+[@][^ ]+)[>]\z/ ) {
+                # "shironeko@example.jp":
+                # ---- OR ----
+                # <kijitora@6jo.example.co.jp>
+                #
+                # Reason:
+                # delivery retry timeout exceeded
                 if( length $v->{'recipient'} ) {
                     # There are multiple recipient addresses in the message body.
                     push @$dscontents, __PACKAGE__->DELIVERYSTATUS;
@@ -99,34 +114,32 @@ sub scan {
                 $v->{'recipient'} = $1;
                 $recipients++;
 
-            } elsif( $e =~ m/\A(?:Sun|Mon|Tue|Wed|Thu|Fri|Sat)[\s,]/ ) {
-                # Thu 29 Apr 2010 23:34:45 +0900
-                $v->{'date'} = $e;
+            } elsif( $e =~ m/\ASMTP error .+ ([A-Z]{4}) command:\z/ ) {
+                # SMTP error from remote server after RCPT command:
+                $v->{'command'} = $1;
 
-            } elsif( $e =~ m/\A[^ ]+[@][^ ]+:\s*\[(\d+[.]\d+[.]\d+[.]\d)\],\s*(.+)\z/ ) {
-                # kijitora@example.com: [192.0.2.5], 550 kijitora@example.com... No such user
+            } elsif( $e =~ m/\Ahost:\s*(.+)\z/ ) {
+                # host: mx.example.jp
                 $v->{'rhost'} = $1;
-                $v->{'diagnosis'} = $2;
 
             } else {
-                # Fallback, parse RFC3464 headers.
-                if( $e =~ m/\ADiagnostic-Code:[ ]*(.+?);[ ]*(.+)\z/i ) {
-                    # Diagnostic-Code: SMTP; 550 5.1.1 <userunknown@example.jp>... User Unknown
-                    $v->{'spec'} = uc $1;
-                    $v->{'diagnosis'} = $2;
+                # Get error message
+                if( $e =~ m/\b[45][.]\d[.]\d\b/  ||
+                    $e =~ m/[<][^ ]+[@][^ ]+[>]/ ||
+                    $e =~ m/\b[45]\d{2}\b/ ) {
 
-                } elsif( $p =~ m/\ADiagnostic-Code:[ ]*/i && $e =~ m/\A[\s\t]+(.+)\z/ ) {
-                    # Continued line of the value of Diagnostic-Code header
-                    $v->{'diagnosis'} .= ' '.$1;
-                    $e = 'Diagnostic-Code: '.$e;
+                    $v->{'diagnosis'} ||= $e;
 
-                } elsif( $e =~ m/\AAction:[ ]*(.+)\z/i ) {
-                    # Action: failed
-                    $v->{'action'} = lc $1;
+                } else {
+                    next if $e =~ m/\A\z/;
+                    if( $e =~ m/\AReason:\z/ ) {
+                        # Reason:
+                        # delivery retry timeout exceeded
+                        $v->{'diagnosis'} = $e;
 
-                } elsif( $e =~ m/\AStatus:[ ]*(\d[.]\d+[.]\d+)/i ) {
-                    # Status: 5.0.-
-                    $v->{'status'} = $1;
+                    } elsif( $v->{'diagnosis'} =~ m/\AReason:\z/ ) {
+                        $v->{'diagnosis'} = $e;
+                    }
                 }
             }
         } # End of if: rfc822
@@ -144,7 +157,6 @@ sub scan {
 
     for my $e ( @$dscontents ) {
         # Set default values if each value is empty.
-        $e->{'agent'} ||= __PACKAGE__->smtpagent;
 
         if( scalar @{ $mhead->{'received'} } ) {
             # Get localhost and remote host name from Received header.
@@ -152,13 +164,24 @@ sub scan {
             $e->{'lhost'} ||= shift @{ Sisimai::RFC5322->received( $r->[0] ) };
             $e->{'rhost'} ||= pop @{ Sisimai::RFC5322->received( $r->[-1] ) };
         }
-        $e->{'diagnosis'} = Sisimai::String->sweep( $e->{'diagnosis'} );
-        $e->{'status'}    = Sisimai::RFC3463->getdsn( $e->{'diagnosis'} );
-        $e->{'spec'}      = $e->{'reason'} eq 'mailererror' ? 'X-UNIX' : 'SMTP';
-        $e->{'action'}    = 'failed' if $e->{'status'} =~ m/\A[45]/;
 
-    } # end of for()
+        $e->{'diagnosis'} =~ s{\\n}{ }g;
+        $e->{'diagnosis'} =  Sisimai::String->sweep( $e->{'diagnosis'} );
 
+        SESSION: for my $r ( keys %$RxSess ) {
+            # Verify each regular expression of session errors
+            PATTERN: for my $rr ( @{ $RxSess->{ $r } } ) {
+                # Check each regular expression
+                next unless $e->{'diagnosis'} =~ $rr;
+                $e->{'reason'} = $r;
+                last(SESSION);
+            }
+        }
+
+        $e->{'status'}  =  Sisimai::RFC3463->getdsn( $e->{'diagnosis'} );
+        $e->{'spec'}  ||= 'SMTP';
+        $e->{'agent'} ||= __PACKAGE__->smtpagent;
+    }
     return { 'ds' => $dscontents, 'rfc822' => $rfc822part };
 }
 
@@ -169,16 +192,16 @@ __END__
 
 =head1 NAME
 
-Sisimai::MTA::SurfControl - bounce mail parser class for C<SurfControl>.
+Sisimai::MSP::DE::GMX - bounce mail parser class for C<GMX>.
 
 =head1 SYNOPSIS
 
-    use Sisimai::MTA::SurfControl;
+    use Sisimai::MSP::DE::GMX;
 
 =head1 DESCRIPTION
 
-Sisimai::MTA::SurfControl parses a bounce email which created by C<WebSense
-SurfControl>. Methods in the module are called from only Sisimai::Message.
+Sisimai::MSP::DE::GMX parses a bounce email which created by C<GMX>.
+Methods in the module are called from only Sisimai::Message.
 
 =head1 CLASS METHODS
 
@@ -186,19 +209,19 @@ SurfControl>. Methods in the module are called from only Sisimai::Message.
 
 C<version()> returns the version number of this module.
 
-    print Sisimai::MTA::SurfControl->version;
+    print Sisimai::MSP::DE::GMX->version;
 
 =head2 C<B<description()>>
 
 C<description()> returns description string of this module.
 
-    print Sisimai::MTA::SurfControl->description;
+    print Sisimai::MSP::DE::GMX->description;
 
 =head2 C<B<smtpagent()>>
 
 C<smtpagent()> returns MTA name.
 
-    print Sisimai::MTA::SurfControl->smtpagent;
+    print Sisimai::MSP::DE::GMX->smtpagent;
 
 =head2 C<B<scan( I<header data>, I<reference to body string>)>>
 
