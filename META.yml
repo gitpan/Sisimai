@@ -26,7 +26,7 @@ no_index:
 provides:
   Sisimai:
     file: lib/Sisimai.pm
-    version: v4.1.4
+    version: v4.1.5
   Sisimai::ARF:
     file: lib/Sisimai/ARF.pm
   Sisimai::Address:
@@ -181,6 +181,6 @@ requires:
   Time::Local: '1.19'
   Try::Tiny: '0.16'
   perl: '5.010'
-version: 4.1.4
+version: 4.1.5
 x_contributors:
   - 'azumakuniyuki <azumakuniyuki@gmail.com>'
