@@ -59,7 +59,7 @@
    "provides" : {
       "Sisimai" : {
          "file" : "lib/Sisimai.pm",
-         "version" : "v4.1.5"
+         "version" : "v4.1.6"
       },
       "Sisimai::ARF" : {
          "file" : "lib/Sisimai/ARF.pm"
@@ -102,6 +102,9 @@
       },
       "Sisimai::MSP::RU::MailRu" : {
          "file" : "lib/Sisimai/MSP/RU/MailRu.pm"
+      },
+      "Sisimai::MSP::RU::Yandex" : {
+         "file" : "lib/Sisimai/MSP/RU/Yandex.pm"
       },
       "Sisimai::MSP::US::AmazonSES" : {
          "file" : "lib/Sisimai/MSP/US/AmazonSES.pm"
@@ -285,7 +288,7 @@
       }
    },
    "release_status" : "stable",
-   "version" : "4.1.5",
+   "version" : "4.1.6",
    "x_contributors" : [
       "azumakuniyuki <azumakuniyuki@gmail.com>"
    ]

@@ -1,9 +1,9 @@
 use strict;
 use Test::More;
 use lib qw(./lib ./blib/lib);
-use Sisimai::MSP::US::Yahoo;
+use Sisimai::MSP::RU::Yandex;
 
-my $PackageName = 'Sisimai::MSP::US::Yahoo';
+my $PackageName = 'Sisimai::MSP::RU::Yandex';
 my $MethodNames = {
     'class' => [ 
         'version', 'description', 'headerlist', 'scan',
@@ -13,10 +13,7 @@ my $MethodNames = {
 };
 my $ReturnValue = {
     '01' => { 'status' => qr/\A5[.]1[.]1\z/, 'reason' => qr/userunknown/ },
-    '02' => { 'status' => qr/\A5[.]2[.]2\z/, 'reason' => qr/mailboxfull/ },
-    '03' => { 'status' => qr/\A5[.]1[.]1\z/, 'reason' => qr/userunknown/ },
-    '04' => { 'status' => qr/\A5[.]2[.]2\z/, 'reason' => qr/mailboxfull/ },
-    '05' => { 'status' => qr/\A5[.]2[.]1\z/, 'reason' => qr/filtered/ },
+    '02' => { 'status' => qr/\A5[.][12][.][12]\z/, 'reason' => qr/(?:userunknown|mailboxfull)/ },
 };
 
 use_ok $PackageName;
@@ -42,7 +39,7 @@ MAKE_TEST: {
 
     PARSE_EACH_MAIL: for my $n ( 1..20 ) {
 
-        my $emailfn = sprintf( "./eg/maildir-as-a-sample/new/us-yahoo-%02d.eml", $n );
+        my $emailfn = sprintf( "./eg/maildir-as-a-sample/new/ru-yandex-%02d.eml", $n );
         my $mailbox = Sisimai::Mail->new( $emailfn );
         my $emindex = sprintf( "%02d", $n );
         next unless defined $mailbox;
@@ -61,7 +58,7 @@ MAKE_TEST: {
             for my $e ( @{ $p->ds } ) {
                 ok length $e->{'recipient'}, '->recipient = '.$e->{'recipient'};
                 ok length $e->{'diagnosis'}, '->diagnosis = '.$e->{'diagnosis'};
-                is $e->{'agent'}, 'US::Yahoo', '->agent = '.$e->{'agent'};
+                is $e->{'agent'}, 'RU::Yandex', '->agent = '.$e->{'agent'};
 
                 ok defined $e->{'date'}, '->date = '.$e->{'date'};
                 ok defined $e->{'spec'}, '->spec = '.$e->{'spec'};

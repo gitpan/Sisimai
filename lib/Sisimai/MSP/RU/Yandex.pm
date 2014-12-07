@@ -1,32 +1,25 @@
-package Sisimai::MSP::US::Aol;
+package Sisimai::MSP::RU::Yandex;
 use parent 'Sisimai::MSP';
 use feature ':5.10';
 use strict;
 use warnings;
 
 my $RxMSP = {
-    'from'    => qr/\APostmaster [<]Postmaster[@]AOL[.]com[>]\z/,
-    'begin'   => qr|\AContent-Type: message/delivery-status|,
+    'from'    => qr/\Amailer-daemon[@]yandex[.]ru\z/,
+    'begin'   => qr/\AThis is the mail system at host yandex[.]ru[.]/,
     'rfc822'  => qr|\AContent-Type: message/rfc822|,
     'endof'   => qr/\A__END_OF_EMAIL_MESSAGE__\z/,
-    'subject' => qr/\AUndeliverable: /,
 };
 
-my $RxErr = {
-    'hostunknown' => [
-        qr/Host or domain name not found/,
-    ],
-};
-
-sub version     { '4.0.1' }
-sub description { 'Aol Mail' }
-sub smtpagent   { 'US::Aol' }
+sub version     { '4.0.0' }
+sub description { 'Yandex.Mail' }
+sub smtpagent   { 'RU::Yandex' }
 sub headerlist  { 
-    return [ 'X-BounceIO-Id', 'X-AOL-IP' ]
+    return [ 'X-Yandex-Front', 'X-Yandex-TimeMark', 'X-Yandex-Uniq' ]
 }
 
 sub scan {
-    # @Description  Detect an error from Aol Mail
+    # @Description  Detect an error from Yandex.Mail
     # @Param <ref>  (Ref->Hash) Message header
     # @Param <ref>  (Ref->String) Message body
     # @Return       (Ref->Hash) Bounce data list and message/rfc822 part
@@ -34,9 +27,8 @@ sub scan {
     my $mhead = shift // return undef;
     my $mbody = shift // return undef;
 
-    return undef unless $mhead->{'x-aol-ip'};
-    return undef unless $mhead->{'subject'} =~ $RxMSP->{'subject'};
-    return undef unless $mhead->{'from'}    =~ $RxMSP->{'from'};
+    return undef unless $mhead->{'x-yandex-uniq'};
+    return undef unless $mhead->{'from'} =~ $RxMSP->{'from'};
 
     my $dscontents = [];    # (Ref->Array) SMTP session errors: message/delivery-status
     my $rfc822head = undef; # (Ref->Array) Required header list in message/rfc822 part
@@ -45,6 +37,7 @@ sub scan {
     my $previousfn = '';    # (String) Previous field name
 
     my $stripedtxt = [ split( "\n", $$mbody ) ];
+    my $commandset = [];    # (Ref->Array) ``in reply to * command'' list
     my $recipients = 0;     # (Integer) The number of 'Final-Recipient' header
     my $connvalues = 0;     # (Integer) Flag, 1 if all the value of $connheader have been set
     my $connheader = {
@@ -92,16 +85,20 @@ sub scan {
             next unless length $e;
 
             if( $connvalues == scalar( keys %$connheader ) ) {
-                # Final-Recipient: rfc822; kijitora@example.co.jp
-                # Original-Recipient: rfc822;kijitora@example.co.jp
+                # Final-Recipient: rfc822; kijitora@example.jp
+                # Original-Recipient: rfc822;kijitora@example.jp
                 # Action: failed
-                # Status: 5.2.2
-                # Remote-MTA: dns; mx.example.co.jp
-                # Diagnostic-Code: smtp; 550 5.2.2 <kijitora@example.co.jp>... Mailbox Full
+                # Status: 5.1.1
+                # Remote-MTA: dns; mx.example.jp
+                # Diagnostic-Code: smtp; 550 5.1.1 <kijitora@example.jp>... User Unknown
+                #
+                # --367D79E130D.1417885948/forward1h.mail.yandex.net
+                # Content-Description: Undelivered Message
+                # Content-Type: message/rfc822
                 $v = $dscontents->[ -1 ];
 
                 if( $e =~ m/\AFinal-Recipient:[ ]*rfc822;[ ]*([^ ]+)\z/i ) {
-                    # Final-Recipient: RFC822; userunknown@example.jp
+                    # Final-Recipient: rfc822; kijitora@example.jp
                     if( length $v->{'recipient'} ) {
                         # There are multiple recipient addresses in the message body.
                         push @$dscontents, __PACKAGE__->DELIVERYSTATUS;
@@ -138,12 +135,11 @@ sub scan {
 
             } else {
                 # Content-Type: message/delivery-status
-                # Content-Transfer-Encoding: 7bit
-                #
-                # Reporting-MTA: dns; omr-m5.mx.aol.com
-                # X-Outbound-Mail-Relay-Queue-ID: CCBA43800007F
-                # X-Outbound-Mail-Relay-Sender: rfc822; shironeko@aol.example.jp
-                # Arrival-Date: Fri, 21 Nov 2014 17:14:34 -0500 (EST)
+                # 
+                # Reporting-MTA: dns; forward1h.mail.yandex.net
+                # X-Yandex-Queue-ID: 367D79E130D
+                # X-Yandex-Sender: rfc822; shironeko@yandex.example.com
+                # Arrival-Date: Sat,  6 Dec 2014 20:12:27 +0300 (MSK)
                 if( $e =~ m/\AReporting-MTA:[ ]*dns;[ ]*(.+)\z/i ) {
                     # Reporting-MTA: dns; mx.example.jp
                     next if length $connheader->{'lhost'};
@@ -155,6 +151,18 @@ sub scan {
                     next if length $connheader->{'date'};
                     $connheader->{'date'} = $1;
                     $connvalues++;
+                } else {
+                    # <kijitora@example.jp>: host mx.example.jp[192.0.2.153] said: 550
+                    #    5.1.1 <kijitora@example.jp>... User Unknown (in reply to RCPT TO
+                    #    command)
+                    if( $e =~ m/\s[(]in reply to .*([A-Z]{4}).*/ ) {
+                        # 5.1.1 <userunknown@example.co.jp>... User Unknown (in reply to RCPT TO
+                        push @$commandset, $1;
+
+                    } elsif( $e =~ m/([A-Z]{4})\s*.*command[)]\z/ ) {
+                        # to MAIL command)
+                        push @$commandset, $1;
+                    }
                 }
             }
         } # End of if: rfc822
@@ -173,6 +181,7 @@ sub scan {
     for my $e ( @$dscontents ) {
         # Set default values if each value is empty.
         map { $e->{ $_ } ||= $connheader->{ $_ } || '' } keys %$connheader;
+        $e->{'command'} = shift @$commandset || '';
 
         if( scalar @{ $mhead->{'received'} } ) {
             # Get localhost and remote host name from Received header.
@@ -183,16 +192,6 @@ sub scan {
 
         $e->{'diagnosis'} =~ s{\\n}{ }g;
         $e->{'diagnosis'} =  Sisimai::String->sweep( $e->{'diagnosis'} );
-
-        SESSION: for my $r ( keys %$RxErr ) {
-            # Verify each regular expression of session errors
-            PATTERN: for my $rr ( @{ $RxErr->{ $r } } ) {
-                # Check each regular expression
-                next(PATTERN) unless $e->{'diagnosis'} =~ $rr;
-                $e->{'reason'} = $r;
-                last(SESSION);
-            }
-        }
 
         if( length( $e->{'status'} ) == 0 || $e->{'status'} =~ m/\A\d[.]0[.]0\z/ ) {
             # There is no value of Status header or the value is 5.0.0, 4.0.0
@@ -213,15 +212,15 @@ __END__
 
 =head1 NAME
 
-Sisimai::MSP::US::Aol - bounce mail parser class for C<Aol Mail>.
+Sisimai::MSP::RU::Yandex - bounce mail parser class for C<Yandex.Mail>.
 
 =head1 SYNOPSIS
 
-    use Sisimai::MSP::US::Aol;
+    use Sisimai::MSP::RU::Yandex;
 
 =head1 DESCRIPTION
 
-Sisimai::MSP::US::Aol parses a bounce email which created by C<Aol Mail>.
+Sisimai::MSP::RU::Yandex parses a bounce email which created by C<Yandex.Mail>.
 Methods in the module are called from only Sisimai::Message.
 
 =head1 CLASS METHODS
@@ -230,19 +229,19 @@ Methods in the module are called from only Sisimai::Message.
 
 C<version()> returns the version number of this module.
 
-    print Sisimai::MSP::US::Aol->version;
+    print Sisimai::MSP::RU::Yandex->version;
 
 =head2 C<B<description()>>
 
 C<description()> returns description string of this module.
 
-    print Sisimai::MSP::US::Aol->description;
+    print Sisimai::MSP::RU::Yandex->description;
 
 =head2 C<B<smtpagent()>>
 
 C<smtpagent()> returns MTA name.
 
-    print Sisimai::MSP::US::Aol->smtpagent;
+    print Sisimai::MSP::RU::Yandex->smtpagent;
 
 =head2 C<B<scan( I<header data>, I<reference to body string>)>>
 
