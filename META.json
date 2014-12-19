@@ -59,7 +59,7 @@
    "provides" : {
       "Sisimai" : {
          "file" : "lib/Sisimai.pm",
-         "version" : "v4.1.7"
+         "version" : "v4.1.8"
       },
       "Sisimai::ARF" : {
          "file" : "lib/Sisimai/ARF.pm"
@@ -294,7 +294,7 @@
       }
    },
    "release_status" : "stable",
-   "version" : "4.1.7",
+   "version" : "4.1.8",
    "x_contributors" : [
       "azumakuniyuki <azumakuniyuki@gmail.com>"
    ]

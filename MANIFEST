@@ -215,6 +215,7 @@ lib/Sisimai/ARF.pm
 lib/Sisimai/Address.pm
 lib/Sisimai/Data.pm
 lib/Sisimai/Data/JSON.pm
+lib/Sisimai/Data/YAML.pm
 lib/Sisimai/ISO3166.pm
 lib/Sisimai/MDA.pm
 lib/Sisimai/MIME.pm
@@ -365,6 +366,7 @@ t/300-rhost.t
 t/301-rhost-googleapps.t
 t/500-data.t
 t/501-data-json.t
+t/502-data-yaml.t
 t/900-modules.pl
 t/999-values.pl
 xt/001-used-modules.t
