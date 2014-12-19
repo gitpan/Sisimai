@@ -27,6 +27,7 @@ sub list {
             MSP/US/SendGrid.pm
             MSP/US/Verizon.pm
             MSP/US/Yahoo.pm
+            MSP/US/Zoho.pm
         MTA.pm
             MTA/Activehunter.pm
             MTA/Courier.pm
@@ -48,6 +49,7 @@ sub list {
             MTA/SurfControl.pm
             MTA/V5sendmail.pm
             MTA/X1.pm
+            MTA/X2.pm
         Reason.pm
             Reason/Blocked.pm
             Reason/ContentError.pm

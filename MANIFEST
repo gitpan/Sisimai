@@ -100,6 +100,7 @@ eg/maildir-as-a-sample/new/mfilter-02.eml
 eg/maildir-as-a-sample/new/mfilter-03.eml
 eg/maildir-as-a-sample/new/mxlogic-01.eml
 eg/maildir-as-a-sample/new/mxlogic-02.eml
+eg/maildir-as-a-sample/new/mxlogic-03.eml
 eg/maildir-as-a-sample/new/notes-01.eml
 eg/maildir-as-a-sample/new/notes-02.eml
 eg/maildir-as-a-sample/new/notes-03.eml
@@ -134,6 +135,7 @@ eg/maildir-as-a-sample/new/ru-mailru-02.eml
 eg/maildir-as-a-sample/new/ru-mailru-03.eml
 eg/maildir-as-a-sample/new/ru-yandex-01.eml
 eg/maildir-as-a-sample/new/ru-yandex-02.eml
+eg/maildir-as-a-sample/new/ru-yandex-03.eml
 eg/maildir-as-a-sample/new/sendmail-01.eml
 eg/maildir-as-a-sample/new/sendmail-02.eml
 eg/maildir-as-a-sample/new/sendmail-03.eml
@@ -189,6 +191,11 @@ eg/maildir-as-a-sample/new/us-yahoo-02.eml
 eg/maildir-as-a-sample/new/us-yahoo-03.eml
 eg/maildir-as-a-sample/new/us-yahoo-04.eml
 eg/maildir-as-a-sample/new/us-yahoo-05.eml
+eg/maildir-as-a-sample/new/us-zoho-01.eml
+eg/maildir-as-a-sample/new/us-zoho-02.eml
+eg/maildir-as-a-sample/new/us-zoho-03.eml
+eg/maildir-as-a-sample/new/us-zoho-04.eml
+eg/maildir-as-a-sample/new/us-zoho-05.eml
 eg/maildir-as-a-sample/new/v5sendmail-01.eml
 eg/maildir-as-a-sample/new/v5sendmail-02.eml
 eg/maildir-as-a-sample/new/v5sendmail-03.eml
@@ -198,6 +205,9 @@ eg/maildir-as-a-sample/new/v5sendmail-06.eml
 eg/maildir-as-a-sample/new/v5sendmail-07.eml
 eg/maildir-as-a-sample/new/x1-01.eml
 eg/maildir-as-a-sample/new/x1-02.eml
+eg/maildir-as-a-sample/new/x2-01.eml
+eg/maildir-as-a-sample/new/x2-02.eml
+eg/maildir-as-a-sample/new/x2-03.eml
 eg/maildir-as-a-sample/tmp/is-not-bounce-01.eml
 eg/mbox-as-a-sample
 lib/Sisimai.pm
@@ -223,6 +233,7 @@ lib/Sisimai/MSP/US/Outlook.pm
 lib/Sisimai/MSP/US/SendGrid.pm
 lib/Sisimai/MSP/US/Verizon.pm
 lib/Sisimai/MSP/US/Yahoo.pm
+lib/Sisimai/MSP/US/Zoho.pm
 lib/Sisimai/MTA.pm
 lib/Sisimai/MTA/Activehunter.pm
 lib/Sisimai/MTA/Courier.pm
@@ -242,6 +253,7 @@ lib/Sisimai/MTA/Sendmail.pm
 lib/Sisimai/MTA/SurfControl.pm
 lib/Sisimai/MTA/V5sendmail.pm
 lib/Sisimai/MTA/X1.pm
+lib/Sisimai/MTA/X2.pm
 lib/Sisimai/MTA/mFILTER.pm
 lib/Sisimai/MTA/qmail.pm
 lib/Sisimai/Mail.pm
@@ -311,6 +323,7 @@ t/068-mta-surfcontrol.t
 t/070-mta-v5sendmail.t
 t/071-mta-messagingserver.t
 t/091-mta-x1.t
+t/092-mta-x2.t
 t/100-mda.t
 t/101-arf.t
 t/110-msp.t
@@ -328,6 +341,7 @@ t/121-msp-us-outlook.t
 t/122-msp-ru-mailru.t
 t/123-msp-de-gmx.t
 t/124-msp-ru-yandex.t
+t/125-msp-us-zoho.t
 t/200-reason.t
 t/201-reason-userunknown.t
 t/202-reason-relayingdenied.t
@@ -350,6 +364,7 @@ t/218-reason-blocked.t
 t/300-rhost.t
 t/301-rhost-googleapps.t
 t/500-data.t
+t/501-data-json.t
 t/900-modules.pl
 t/999-values.pl
 xt/001-used-modules.t
@@ -373,6 +388,7 @@ xt/118-mta-surfcontrol.t
 xt/120-mta-v5sendmail.t
 xt/121-mta-messagingserver.t
 xt/141-mta-x1.t
+xt/142-mta-x2.t
 xt/201-msp-us-google.t
 xt/202-msp-jp-kddi.t
 xt/203-msp-us-verizon.t
@@ -387,6 +403,7 @@ xt/211-msp-us-outlook.t
 xt/212-msp-ru-mailru.t
 xt/213-msp-de-gmx.t
 xt/214-msp-ru-yandex.t
+xt/215-msp-us-zoho.t
 xt/300-arf.t
 xt/310-rfc3464.t
 META.yml

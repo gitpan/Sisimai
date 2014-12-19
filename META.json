@@ -59,7 +59,7 @@
    "provides" : {
       "Sisimai" : {
          "file" : "lib/Sisimai.pm",
-         "version" : "v4.1.6"
+         "version" : "v4.1.7"
       },
       "Sisimai::ARF" : {
          "file" : "lib/Sisimai/ARF.pm"
@@ -130,6 +130,9 @@
       "Sisimai::MSP::US::Yahoo" : {
          "file" : "lib/Sisimai/MSP/US/Yahoo.pm"
       },
+      "Sisimai::MSP::US::Zoho" : {
+         "file" : "lib/Sisimai/MSP/US/Zoho.pm"
+      },
       "Sisimai::MTA" : {
          "file" : "lib/Sisimai/MTA.pm"
       },
@@ -186,6 +189,9 @@
       },
       "Sisimai::MTA::X1" : {
          "file" : "lib/Sisimai/MTA/X1.pm"
+      },
+      "Sisimai::MTA::X2" : {
+         "file" : "lib/Sisimai/MTA/X2.pm"
       },
       "Sisimai::MTA::mFILTER" : {
          "file" : "lib/Sisimai/MTA/mFILTER.pm"
@@ -288,7 +294,7 @@
       }
    },
    "release_status" : "stable",
-   "version" : "4.1.6",
+   "version" : "4.1.7",
    "x_contributors" : [
       "azumakuniyuki <azumakuniyuki@gmail.com>"
    ]
