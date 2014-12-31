@@ -15,6 +15,7 @@ sub list {
         Message.pm
         MDA.pm
         MSP.pm
+            MSP/DE/EinsUndEins.pm
             MSP/DE/GMX.pm
             MSP/JP/Biglobe.pm
             MSP/JP/EZweb.pm
@@ -39,6 +40,7 @@ sub list {
             MTA/IMailServer.pm
             MTA/InterScanMSS.pm
             MTA/MailFoundry.pm
+            MTA/MailMarshalSMTP.pm
             MTA/McAfee.pm
             MTA/MessagingServer.pm
             MTA/mFILTER.pm
@@ -52,6 +54,7 @@ sub list {
             MTA/V5sendmail.pm
             MTA/X1.pm
             MTA/X2.pm
+            MTA/X3.pm
         Reason.pm
             Reason/Blocked.pm
             Reason/ContentError.pm

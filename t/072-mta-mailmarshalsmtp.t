@@ -1,9 +1,9 @@
 use strict;
 use Test::More;
 use lib qw(./lib ./blib/lib);
-use Sisimai::MSP::US::Outlook;
+use Sisimai::MTA::MailMarshalSMTP;
 
-my $PackageName = 'Sisimai::MSP::US::Outlook';
+my $PackageName = 'Sisimai::MTA::MailMarshalSMTP';
 my $MethodNames = {
     'class' => [ 
         'version', 'description', 'headerlist', 'scan',
@@ -12,11 +12,7 @@ my $MethodNames = {
     'object' => [],
 };
 my $ReturnValue = {
-    '01' => { 'status' => qr/\A5[.]2[.]2\z/, 'reason' => qr/mailboxfull/ },
-    '02' => { 'status' => qr/\A5[.]1[.]1\z/, 'reason' => qr/userunknown/ },
-    '03' => { 'status' => qr/\A5[.]5[.]0\z/, 'reason' => qr/hostunknown/ },
-    '04' => { 'status' => qr/\A5[.][12][.][12]\z/, 'reason' => qr/(?:mailboxfull|userunknown)/ },
-    '05' => { 'status' => qr/\A5[.]5[.]0\z/, 'reason' => qr/userunknown/ },
+    '01' => { 'status' => qr/\A5[.]1[.]1\z/, 'reason' => qr/userunknown/ },
 };
 
 use_ok $PackageName;
@@ -36,13 +32,13 @@ MAKE_TEST: {
 
     is $PackageName->scan, undef, '->scan';
 
-    use Sisimai::Mail;
     use Sisimai::Data;
+    use Sisimai::Mail;
     use Sisimai::Message;
 
     PARSE_EACH_MAIL: for my $n ( 1..20 ) {
 
-        my $emailfn = sprintf( "./eg/maildir-as-a-sample/new/us-outlook-%02d.eml", $n );
+        my $emailfn = sprintf( "./eg/maildir-as-a-sample/new/mailmarshalsmtp-%02d.eml", $n );
         my $mailbox = Sisimai::Mail->new( $emailfn );
         my $emindex = sprintf( "%02d", $n );
         next unless defined $mailbox;
@@ -61,7 +57,7 @@ MAKE_TEST: {
             for my $e ( @{ $p->ds } ) {
                 ok length $e->{'recipient'}, '->recipient = '.$e->{'recipient'};
                 ok length $e->{'diagnosis'}, '->diagnosis = '.$e->{'diagnosis'};
-                is $e->{'agent'}, 'US::Outlook', '->agent = '.$e->{'agent'};
+                is $e->{'agent'}, 'MailMarshalSMTP', '->agent = '.$e->{'agent'};
 
                 ok defined $e->{'date'}, '->date = '.$e->{'date'};
                 ok defined $e->{'spec'}, '->spec = '.$e->{'spec'};

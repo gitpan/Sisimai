@@ -1,26 +1,25 @@
-package Sisimai::MTA::X2;
+package Sisimai::MTA::MailMarshalSMTP;
 use parent 'Sisimai::MTA';
 use feature ':5.10';
 use strict;
 use warnings;
 
 my $RxMTA = {
-    'from'     => qr/MAILER-DAEMON[@]/,
-    'begin'    => qr/\AUnable to deliver message to the following address/,
+    'begin'    => qr/\AYour message:\z/,
+    'rfc822'   => undef,
+    'error'    => qr/\ACould not be delivered because of\z/,
+    'rcpts'    => qr/\AThe following recipients were affected:/,
     'endof'    => qr/\A__END_OF_EMAIL_MESSAGE__\z/,
-    'rfc822'   => qr/\A--- Original message follows/,
-    'subject'  => [
-        qr/\ADelivery failure/,
-        qr/\Afail(?:ure|ed) delivery/,
-    ],
+    'subject'  => qr/\AUndeliverable Mail: ["]/,
 };
 
 sub version     { '4.0.0' }
-sub description { 'Unknown MTA #2' }
-sub smtpagent   { 'X2' }
+sub description { 'Trustwave Secure Email Gateway' }
+sub smtpagent   { 'MailMarshalSMTP' }
+sub headerlist  { return [ 'X-Mailer' ] }
 
 sub scan {
-    # @Description  Detect an error from Unknown MTA #2
+    # @Description  Detect an error from MailMarshalSMTP
     # @Param <ref>  (Ref->Hash) Message header
     # @Param <ref>  (Ref->String) Message body
     # @Return       (Ref->Hash) Bounce data list and message/rfc822 part
@@ -28,8 +27,8 @@ sub scan {
     my $mhead = shift // return undef;
     my $mbody = shift // return undef;
 
-    return undef unless $mhead->{'from'} =~ $RxMTA->{'from'};
-    return undef unless grep { $mhead->{'subject'} =~ $_ } @{ $RxMTA->{'subject'} };
+    return undef unless $mhead->{'subject'} =~ $RxMTA->{'subject'};
+    require Sisimai::MIME;
 
     my $dscontents = [];    # (Ref->Array) SMTP session errors: message/delivery-status
     my $rfc822head = undef; # (Ref->Array) Required header list in message/rfc822 part
@@ -37,14 +36,18 @@ sub scan {
     my $rfc822next = { 'from' => 0, 'to' => 0, 'subject' => 0 };
     my $previousfn = '';    # (String) Previous field name
 
-    my $datestring = '';
     my $stripedtxt = [ split( "\n", $$mbody ) ];
     my $recipients = 0;     # (Integer) The number of 'Final-Recipient' header
+    my $boundary00 = '';    # (String) Boundary string
+    my $endoferror = 0;     # (Integer) Flag for the end of error message
 
     my $v = undef;
     my $p = '';
     push @$dscontents, __PACKAGE__->DELIVERYSTATUS;
     $rfc822head = __PACKAGE__->RFC822HEADERS;
+
+    $boundary00 = Sisimai::MIME->boundary( $mhead->{'content-type'} );
+    $RxMTA->{'rfc822'} = qr/\A[-]{2}$boundary00[-]{2}\z/ if length $boundary00;
 
     for my $e ( @$stripedtxt ) {
         # Read each line between $RxMTA->{'begin'} and $RxMTA->{'rfc822'}.
@@ -75,18 +78,23 @@ sub scan {
 
         } else {
             # Before "message/rfc822"
-            next unless ( $e =~ $RxMTA->{'begin'} ) .. ( $e =~ $RxMTA->{'rfc822'} );
-            next unless length $e;
+            last if $e =~ $RxMTA->{'rfc822'};
 
-            # Message from example.com.
-            # Unable to deliver message to the following address(es).
+            # Your message:
+            #    From:    originalsender@example.com
+            #    Subject: IIdentificação
             #
-            # <kijitora@example.com>:
-            # This user doesn't have a example.com account (kijitora@example.com) [0]
+            # Could not be delivered because of
+            #
+            # 550 5.1.1 User unknown
+            #
+            # The following recipients were affected: 
+            #    dummyuser@blabla.xxxxxxxxxxxx.com
             $v = $dscontents->[ -1 ];
 
-            if( $e =~ m/\A[<]([^ ]+[@][^ ]+)[>]:\z/ ) {
-                # <kijitora@example.com>:
+            if( $e =~ m/\A\s{4}([^ ]+[@][^ ]+)\z/ ) {
+                # The following recipients were affected: 
+                #    dummyuser@blabla.xxxxxxxxxxxx.com
                 if( length $v->{'recipient'} ) {
                     # There are multiple recipient addresses in the message body.
                     push @$dscontents, __PACKAGE__->DELIVERYSTATUS;
@@ -96,9 +104,45 @@ sub scan {
                 $recipients++;
 
             } else {
-                # This user doesn't have a example.com account (kijitora@example.com) [0]
-                $v->{'diagnosis'} = ' '.$e;
-            }
+                # Get error message lines
+                if( $e =~ $RxMTA->{'error'} ) {
+                    # Could not be delivered because of
+                    #
+                    # 550 5.1.1 User unknown
+                    $v->{'diagnosis'} = $e;
+
+                } elsif( length $v->{'diagnosis'} && $endoferror == 0 ) {
+                    # Append error messages
+                    $endoferror = 1 if $e =~ $RxMTA->{'rcpts'};
+                    next if $endoferror;
+
+                    $v->{'diagnosis'} .= ' '.$e;
+
+                } else {
+                    # Additional Information
+                    # ======================
+                    # Original Sender:    <originalsender@example.com>
+                    # Sender-MTA:         <10.11.12.13>
+                    # Remote-MTA:         <10.0.0.1>
+                    # Reporting-MTA:      <relay.xxxxxxxxxxxx.com>
+                    # MessageName:        <B549996730000.000000000001.0003.mml>
+                    # Last-Attempt-Date:  <16:21:07 seg, 22 Dezembro 2014>
+                    if( $e =~ m/\AOriginal Sender:\s+[<](.+)[>]\z/ ) {
+                        # Original Sender:    <originalsender@example.com>
+                        # Use this line instead of "From" header of the original
+                        # message.
+                        $rfc822part .= sprintf("From: %s\n", $1 );
+
+                    } elsif( $e =~ m/\ASender-MTA:\s+[<](.+)[>]\z/ ) {
+                        # Sender-MTA:         <10.11.12.13>
+                        $v->{'lhost'} = $1;
+
+                    } elsif( $e =~ m/\AReporting-MTA:\s+[<](.+)[>]\z/ ) {
+                        # Reporting-MTA:      <relay.xxxxxxxxxxxx.com>
+                        $v->{'rhost'} = $1;
+                    }
+                }
+            } 
         } # End of if: rfc822
 
     } continue {
@@ -126,7 +170,6 @@ sub scan {
         $e->{'status'}    = Sisimai::RFC3463->getdsn( $e->{'diagnosis'} );
         $e->{'spec'}      = $e->{'reason'} eq 'mailererror' ? 'X-UNIX' : 'SMTP';
         $e->{'action'}    = 'failed' if $e->{'status'} =~ m/\A[45]/;
-        $e->{'date'}      = $datestring || '';
 
     } # end of for()
 
@@ -140,16 +183,18 @@ __END__
 
 =head1 NAME
 
-Sisimai::MTA::X2 - bounce mail parser class for C<X2>.
+Sisimai::MTA::MailMarshalSMTP - bounce mail parser class for C<Trustwave> Secure
+Email Gateway.
 
 =head1 SYNOPSIS
 
-    use Sisimai::MTA::X2;
+    use Sisimai::MTA::MailMarshalSMTP;
 
 =head1 DESCRIPTION
 
-Sisimai::MTA::X2 parses a bounce email which created by Unknown MTA #2. Methods
-in the module are called from only Sisimai::Message.
+Sisimai::MTA::MailMarshalSMTP parses a bounce email which created by 
+C<Trustwave> Secure Email Gateway: formerly MailMarshal SMTP. Methods in the
+module are called from only Sisimai::Message.
 
 =head1 CLASS METHODS
 
@@ -157,19 +202,19 @@ in the module are called from only Sisimai::Message.
 
 C<version()> returns the version number of this module.
 
-    print Sisimai::MTA::X2->version;
+    print Sisimai::MTA::MailMarshalSMTP->version;
 
 =head2 C<B<description()>>
 
 C<description()> returns description string of this module.
 
-    print Sisimai::MTA::X2->description;
+    print Sisimai::MTA::MailMarshalSMTP->description;
 
 =head2 C<B<smtpagent()>>
 
 C<smtpagent()> returns MTA name.
 
-    print Sisimai::MTA::X2->smtpagent;
+    print Sisimai::MTA::MailMarshalSMTP->smtpagent;
 
 =head2 C<B<scan( I<header data>, I<reference to body string>)>>
 

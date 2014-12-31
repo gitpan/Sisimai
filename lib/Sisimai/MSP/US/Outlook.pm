@@ -17,10 +17,13 @@ my $RxErr = {
     'hostunknown' => [
         qr/The mail could not be delivered to the recipient because the domain is not reachable/,
     ],
+    'userunknown' => [
+        qr/Requested action not taken: mailbox unavailable/,
+    ],
 };
 
-sub version     { '4.0.0' }
-sub description { 'Microsoft Outlook.com' }
+sub version     { '4.0.1' }
+sub description { 'Microsoft Outlook.com: https://www.outlook.com/' }
 sub smtpagent   { 'US::Outlook' }
 sub headerlist  { return [ 'X-Message-Delivery', 'X-Message-Info' ] }
 

@@ -26,7 +26,7 @@ no_index:
 provides:
   Sisimai:
     file: lib/Sisimai.pm
-    version: v4.1.8
+    version: v4.1.9
   Sisimai::ARF:
     file: lib/Sisimai/ARF.pm
   Sisimai::Address:
@@ -45,6 +45,8 @@ provides:
     file: lib/Sisimai/MIME.pm
   Sisimai::MSP:
     file: lib/Sisimai/MSP.pm
+  Sisimai::MSP::DE::EinsUndEins:
+    file: lib/Sisimai/MSP/DE/EinsUndEins.pm
   Sisimai::MSP::DE::GMX:
     file: lib/Sisimai/MSP/DE/GMX.pm
   Sisimai::MSP::JP::Biglobe:
@@ -95,6 +97,8 @@ provides:
     file: lib/Sisimai/MTA/MXLogic.pm
   Sisimai::MTA::MailFoundry:
     file: lib/Sisimai/MTA/MailFoundry.pm
+  Sisimai::MTA::MailMarshalSMTP:
+    file: lib/Sisimai/MTA/MailMarshalSMTP.pm
   Sisimai::MTA::McAfee:
     file: lib/Sisimai/MTA/McAfee.pm
   Sisimai::MTA::MessagingServer:
@@ -115,6 +119,8 @@ provides:
     file: lib/Sisimai/MTA/X1.pm
   Sisimai::MTA::X2:
     file: lib/Sisimai/MTA/X2.pm
+  Sisimai::MTA::X3:
+    file: lib/Sisimai/MTA/X3.pm
   Sisimai::MTA::mFILTER:
     file: lib/Sisimai/MTA/mFILTER.pm
   Sisimai::MTA::qmail:
@@ -187,6 +193,7 @@ requires:
   Time::Local: '1.19'
   Try::Tiny: '0.16'
   perl: '5.010'
-version: 4.1.8
+version: 4.1.9
 x_contributors:
+  - 'jcbf <underspell@gmail.com>'
   - 'azumakuniyuki <azumakuniyuki@gmail.com>'
